@@ -39,8 +39,14 @@ import android.os.Handler;
 import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.util.Log;
+import androidx.core.content.FileProvider;
+
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.webkit.MimeTypeMap;
+
+import com.google.android.diskusage.BuildConfig;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -53,7 +59,6 @@ import com.google.android.diskusage.entity.FileSystemPackage;
 import com.google.android.diskusage.entity.FileSystemRoot;
 import com.google.android.diskusage.entity.FileSystemSuperRoot;
 import com.google.android.diskusage.entity.FileSystemSystemSpace;
-import com.google.android.diskusage.utils.MimeTypes;
 
 import java.io.File;
 import java.io.IOException;
@@ -78,8 +83,7 @@ public class DiskUsage extends LoadableActivity {
 
   private String pathToDelete;
 
-  private static final MimeTypes mimeTypes = new MimeTypes();
-  DiskUsageMenu menu = DiskUsageMenu.getInstance(this);
+  public DiskUsageMenu menu = DiskUsageMenu.getInstance(this);
   RendererManager rendererManager = new RendererManager(this);
 
   @Override
@@ -407,18 +411,30 @@ public class DiskUsage extends LoadableActivity {
 
     String fileName = entry.name;
     int dot = fileName.lastIndexOf(".");
+    Log.d("diskusage", "name: " + fileName + " path: " + path + " dot: " + dot);
     if (dot != -1) {
       String extension = fileName.substring(dot + 1).toLowerCase();
-      String mime = mimeTypes.getMimeByExtension(this, extension);
+
+      MimeTypeMap mimeTypeMap = MimeTypeMap.getSingleton();
+      String mime = mimeTypeMap.getMimeTypeFromExtension(extension);
+      Log.d("diskusage", "extension: " + extension + " mime: " + mime);
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        uri = FileProvider.getUriForFile(this, BuildConfig.APPLICATION_ID + ".provider", file);
+      }
       try {
+        intent = new Intent(Intent.ACTION_VIEW);
+        intent.addCategory(Intent.CATEGORY_DEFAULT);
         if (mime != null) {
           intent.setDataAndType(uri, mime);
         } else {
           intent.setDataAndType(uri, "binary/octet-stream");
         }
+        intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivity(intent);
         return;
-      } catch (ActivityNotFoundException|FileUriExposedException e) {
+      } catch (ActivityNotFoundException|FileUriExposedException ignored) {
+        Log.e("diskusage", "Can't open viewer and crash", ignored);
       }
     }
     Toast.makeText(this, str(R.string.no_viewer_found),
