@@ -19,6 +19,12 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
+            versionNameSuffix ".debug"
+            // The development emulator is x86_64. Keep the shipped release
+            // arm64-only; debug builds can also run on the emulator.
+            ndk {
+                abiFilters 'x86_64'
+            }
         }
 
         release {
