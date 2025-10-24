@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      DiskUsage draws its own full-screen visualization. Keep the legacy
+      system-bar layout on Android 15 (API 35) instead of letting the
+      edge-to-edge enforcement overlap the title bar and graph.
+    -->
+    <style name="Theme" parent="android:Theme.Holo.Light">
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+    <style name="Theme.NoBackground" parent="android:Theme.Holo.Light">
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+</resources>

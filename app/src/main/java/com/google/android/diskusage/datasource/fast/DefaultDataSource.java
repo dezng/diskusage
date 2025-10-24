@@ -61,6 +61,10 @@ public class DefaultDataSource extends DataSource {
   @TargetApi(Build.VERSION_CODES.KITKAT)
   @Override
   public PortableFile[] getExternalFilesDirs(Context context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+      PortableFile dir = getExternalFilesDir(context);
+      return dir == null ? new PortableFile[0] : new PortableFile[] {dir};
+    }
     File[] externalFilesDirs = context.getExternalFilesDirs(null);
     PortableFile[] result = new PortableFileImpl[externalFilesDirs.length];
     for (int i = 0; i < externalFilesDirs.length; i++) {

@@ -27,7 +27,10 @@ public class PortableFileImpl implements PortableFile {
   @Override
   public boolean isExternalStorageEmulated() {
     try {
-      return Environment.isExternalStorageEmulated(file);
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        return Environment.isExternalStorageEmulated(file);
+      }
+      return Environment.isExternalStorageEmulated();
     } catch (Exception e) {
       return false;
     }
@@ -37,7 +40,10 @@ public class PortableFileImpl implements PortableFile {
   @Override
   public boolean isExternalStorageRemovable() {
     try {
-      return Environment.isExternalStorageRemovable(file);
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        return Environment.isExternalStorageRemovable(file);
+      }
+      return Environment.isExternalStorageRemovable();
     } catch (Exception e) {
       return false;
     }
