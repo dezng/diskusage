@@ -1,59 +1,128 @@
-//
-// Created by zhe deng on 2025/10/23.
-//
-
 #ifdef ANDROID_JNI_BUILD
+
 #include "scan_jni.h"
-#include <android/log.h>
 
+#include <stdlib.h>
 
-#define LOG_TAG "ScanJNI"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define JNI_WRITE_BUFFER_SIZE (64 * 1024)
 
+/*
+ * The method id is cached after the first lookup. The class is loaded by the
+ * same class loader as the listener passed to scanTree(), so a single lookup
+ * is enough for the lifetime of the process.
+ */
+static jmethodID g_on_data = NULL;
 
-static JavaVM *g_jvm = NULL;
-static jobject g_callback_obj = NULL;
-static jmethodID g_callback_method = NULL;
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+  (void) reserved;
+  JNIEnv *env = NULL;
+  if ((*vm)->GetEnv(vm, (void **) &env, JNI_VERSION_1_6) != JNI_OK) {
+    return JNI_ERR;
+  }
 
-static void scan_callback_jni(const char* path) {
-    if (g_callback_obj == NULL || g_callback_method == NULL) return;
-
-    JNIEnv* env;
-    int getEnvStat = (*g_jvm)->GetEnv(g_jvm, (void**)&env, JNI_VERSION_1_6);
-    if (getEnvStat == JNI_EDETACHED) {
-        (*g_jvm)->AttachCurrentThread(g_jvm, &env, NULL);
+  jclass listenerClass = (*env)->FindClass(
+      env, "com/google/android/diskusage/jniutils/ScanUtils$Listener");
+  if (listenerClass != NULL) {
+    g_on_data = (*env)->GetMethodID(env, listenerClass, "onData", "([BI)V");
+    if (g_on_data == NULL) {
+      /* Lazy lookup in scanTree() will retry with the actual listener. */
+      (*env)->ExceptionClear(env);
     }
-
-    jstring jpath = (*env)->NewStringUTF(env, path);
-    (*env)->CallVoidMethod(env, g_callback_obj, g_callback_method, jpath);
-    (*env)->DeleteLocalRef(env, jpath);
-
-    if (getEnvStat == JNI_EDETACHED) {
-        (*g_jvm)->DetachCurrentThread(g_jvm);
-    }
+    (*env)->DeleteLocalRef(env, listenerClass);
+  } else {
+    /* Lazy lookup in scanTree() will retry with the actual listener object. */
+    (*env)->ExceptionClear(env);
+  }
+  return JNI_VERSION_1_6;
 }
 
-JNIEXPORT void JNICALL
-Java_com_google_android_diskusage_jniutils_ScanUtils_scanDirectory(JNIEnv *env, jobject thiz, jstring path, jobject callback) {
-    const char *path_str = (*env)->GetStringUTFChars(env, path, NULL);
+typedef struct {
+  JNIEnv *env;
+  jobject listener;
+  jbyteArray buffer;
+  jint capacity;
+  int failed;
+} JniSink;
 
+static int jni_write(void *ctx, const char *data, size_t len) {
+  JniSink *sink = (JniSink *) ctx;
+  if (sink->failed) {
+    return -1;
+  }
+  if (len > (size_t) sink->capacity) {
+    sink->failed = 1;
+    return -1;
+  }
 
-    if (g_jvm == NULL) {
-        (*env)->GetJavaVM(env, &g_jvm);
-    }
+  (*sink->env)->SetByteArrayRegion(
+      sink->env, sink->buffer, 0, (jsize) len, (const jbyte *) data);
+  if ((*sink->env)->ExceptionCheck(sink->env)) {
+    sink->failed = 1;
+    return -1;
+  }
 
-
-    g_callback_obj = (*env)->NewGlobalRef(env, callback);
-    jclass callback_class = (*env)->GetObjectClass(env, callback);
-    g_callback_method = (*env)->GetMethodID(env, callback_class, "onScanResult", "(Ljava/lang/String;)V");
-
-
-    scan_tree(path_str, scan_callback_jni);
-
-
-    (*env)->ReleaseStringUTFChars(env, path, path_str);
-    (*env)->DeleteGlobalRef(env, g_callback_obj);
-    g_callback_obj = NULL;
-    g_callback_method = NULL;
+  (*sink->env)->CallVoidMethod(
+      sink->env, sink->listener, g_on_data, sink->buffer, (jint) len);
+  if ((*sink->env)->ExceptionCheck(sink->env)) {
+    sink->failed = 1;
+    return -1;
+  }
+  return 0;
 }
+
+JNIEXPORT jint JNICALL
+Java_com_google_android_diskusage_jniutils_ScanUtils_scanTree(
+    JNIEnv *env, jclass clazz, jstring path, jint blockSize, jobject listener) {
+  (void) clazz;
+
+  if (path == NULL || listener == NULL || blockSize <= 0) {
+    return -1;
+  }
+
+  if (g_on_data == NULL) {
+    jclass listenerClass = (*env)->GetObjectClass(env, listener);
+    if (listenerClass == NULL) {
+      return -1;
+    }
+    g_on_data = (*env)->GetMethodID(env, listenerClass, "onData", "([BI)V");
+    (*env)->DeleteLocalRef(env, listenerClass);
+    if (g_on_data == NULL) {
+      return -1;
+    }
+  }
+
+  const char *pathChars = (*env)->GetStringUTFChars(env, path, NULL);
+  if (pathChars == NULL) {
+    return -1;
+  }
+
+  jbyteArray buffer = (*env)->NewByteArray(env, JNI_WRITE_BUFFER_SIZE);
+  if (buffer == NULL) {
+    (*env)->ReleaseStringUTFChars(env, path, pathChars);
+    return -1;
+  }
+
+  JniSink sink;
+  sink.env = env;
+  sink.listener = listener;
+  sink.buffer = buffer;
+  sink.capacity = JNI_WRITE_BUFFER_SIZE;
+  sink.failed = 0;
+
+  int result = scan_tree_stream(pathChars, blockSize, jni_write, &sink);
+
+  (*env)->ReleaseStringUTFChars(env, path, pathChars);
+  (*env)->DeleteLocalRef(env, buffer);
+
+  if ((*env)->ExceptionCheck(env)) {
+    return -1;
+  }
+  if (result != 0 || sink.failed) {
+    (*env)->ThrowNew(env, "java/lang/RuntimeException",
+                     "Native filesystem scan failed");
+    return -1;
+  }
+  return 0;
+}
+
 #endif

@@ -9,9 +9,17 @@
 #include <jni.h>
 #include "scan.h"
 
-
-JNIEXPORT void JNICALL
-Java_com_google_android_diskusage_jniutils_ScanUtils_scanDirectory(JNIEnv *env, jobject thiz, jstring path, jobject callback) __attribute__((visibility("default")));
+/*
+ * Java_com_google_android_diskusage_jniutils_ScanUtils_scanTree
+ *
+ * The listener receives binary chunks produced by scan_tree_stream(). The
+ * Java side parses them immediately, so at most one chunk plus one Java
+ * byte[] is alive at a time.
+ */
+JNIEXPORT jint JNICALL
+Java_com_google_android_diskusage_jniutils_ScanUtils_scanTree(
+    JNIEnv *env, jclass clazz, jstring path, jint blockSize, jobject listener)
+    __attribute__((visibility("default")));
 
 #endif //DISKUSAGE_SCAN_JNI_H
 #endif

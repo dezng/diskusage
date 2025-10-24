@@ -77,7 +77,8 @@ public class DefaultDataSource extends DataSource {
   public InputStream createNativeScanner(
       Context context, String path, boolean rootRequired)
           throws IOException, InterruptedException {
-    return new NativeScannerStream.Factory(context).create(path, rootRequired);
+    throw new UnsupportedOperationException(
+        "Native scanning is implemented by NativeScanner through JNI streaming");
   }
 
   @Override

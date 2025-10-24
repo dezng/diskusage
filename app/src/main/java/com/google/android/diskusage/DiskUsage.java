@@ -21,13 +21,11 @@ package com.google.android.diskusage;
 
 import android.app.ActivityManager;
 import android.app.AlertDialog;
-import android.app.AppOpsManager;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
@@ -36,17 +34,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.FileUriExposedException;
 import android.os.Handler;
-import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.util.Log;
 import androidx.core.content.FileProvider;
 
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.webkit.MimeTypeMap;
 
-import com.google.android.diskusage.BuildConfig;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -83,6 +78,7 @@ public class DiskUsage extends LoadableActivity {
   public static final String DELETE_PATH_KEY = "path";
   public static final String DELETE_ABSOLUTE_PATH_KEY = "absolute_path";
   String key;
+  boolean useNativeScanner = true;
 
   private String pathToDelete;
 
@@ -98,6 +94,7 @@ public class DiskUsage extends LoadableActivity {
     Intent i = getIntent();
 
 
+    useNativeScanner = i.getBooleanExtra(SCANNER_KEY, useNativeScanner);
     key = i.getStringExtra(KEY_KEY);
     if (key == null) {
       // Just close instead of crashing later
@@ -462,6 +459,7 @@ public class DiskUsage extends LoadableActivity {
     Intent result = new Intent();
     result.putExtra(DiskUsage.STATE_KEY, outState);
     result.putExtra(DiskUsage.KEY_KEY, key);
+    result.putExtra(DiskUsage.SCANNER_KEY, useNativeScanner);
     setResult(0, result);
     finish();
   }
@@ -617,18 +615,15 @@ public class DiskUsage extends LoadableActivity {
     int heap = getMemoryQuota();
 
     FileSystemEntry rootElement;
-    try {
-      final NativeScanner scanner = new NativeScanner(this, stats.blockSize, stats.busyBlocks, heap);
-      progressUpdater = makeProgressUpdater(scanner, stats);
-      handler.post(progressUpdater);
-      rootElement = scanner.scan(mountPoint);
-      handler.removeCallbacks(progressUpdater);
-    } catch (RuntimeException e) {
-      final Scanner scanner = new Scanner(20, stats.blockSize, stats.busyBlocks, heap);
-      progressUpdater = makeProgressUpdater(scanner, stats);
-      handler.post(progressUpdater);
-      rootElement = scanner.scan(DataSource.get().createLegacyScanFile(mountPoint.getRoot()));
-      handler.removeCallbacks(progressUpdater);
+    if (useNativeScanner) {
+      try {
+        rootElement = nativeFirstScanner(stats, mountPoint);
+      } catch (RuntimeException e) {
+        Log.e("NativeScanner", "scan: err.", e);
+        rootElement = normalScanner(stats, heap, mountPoint);
+      }
+    } else {
+      rootElement = normalScanner(stats, heap, mountPoint);
     }
 
     ArrayList<FileSystemEntry> entries = new ArrayList<FileSystemEntry>();
@@ -678,13 +673,35 @@ public class DiskUsage extends LoadableActivity {
     return newRoot;
   }
 
+  private FileSystemEntry normalScanner(FileSystemStats stats, int heap, MountPoint mountPoint) throws IOException {
+    FileSystemEntry rootElement;
+    final Scanner scanner = new Scanner(20, stats.blockSize, stats.busyBlocks, heap);
+    progressUpdater = makeProgressUpdater(scanner, stats);
+    handler.post(progressUpdater);
+    rootElement = scanner.scan(DataSource.get().createLegacyScanFile(mountPoint.getRoot()));
+    Log.d(TAG, "normalScanner: " + rootElement);
+    handler.removeCallbacks(progressUpdater);
+    return rootElement;
+  }
+
+  private FileSystemEntry nativeFirstScanner(FileSystemStats stats, MountPoint mountPoint) throws IOException, InterruptedException {
+    FileSystemEntry rootElement;
+    final NativeScanner scanner = new NativeScanner(stats.blockSize);
+    progressUpdater = makeProgressUpdater(scanner, stats);
+    handler.post(progressUpdater);
+    rootElement = scanner.scan(mountPoint);
+    handler.removeCallbacks(progressUpdater);
+    return rootElement;
+  }
+
   protected FileSystemEntry[] loadApps2SD(int blockSize) {
-    try {
-      return (new Apps2SDLoader(this).load(blockSize));
-    } catch (Throwable t) {
-      Log.e("diskusage", "problem loading apps2sd info", t);
-      return null;
-    }
+    return null;
+//    try {
+//      return (new Apps2SDLoader(this).load(blockSize));
+//    } catch (Throwable t) {
+//      Log.e("diskusage", "problem loading apps2sd info", t);
+//      return null;
+//    }
   }
 
   void moveIntoPackage(FileSystemPackage pkg, FileSystemRoot root, String path, String newName, FileSystemPackage.ChildType type, int blockSize) {
@@ -698,7 +715,7 @@ public class DiskUsage extends LoadableActivity {
   }
 
   void moveAppData(FileSystemEntry[] apps, FileSystemRoot media, int blockSize) {
-    String diskusage = "com.google.android.diskusage";
+    String diskusage = BuildConfig.APPLICATION_ID;
     for (FileSystemEntry a : apps) {
       FileSystemPackage app = (FileSystemPackage)  a;
       try {

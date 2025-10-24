@@ -293,6 +293,7 @@ public class Scanner implements DiskUsage.ProgressGenerator {
 
   private void makeNode(FileSystemEntry parent, String name) {
     createdNode = FileSystemFile.makeNode(parent, name);
+    Log.d(TAG, "makeNode: " + createdNode.absolutePath());
     createdNodeSize =
       4 /* ref in FileSystemEntry[] */
       + 16 /* FileSystemEntry */

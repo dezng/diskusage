@@ -1,32 +1,35 @@
 package com.google.android.diskusage.jniutils;
 
-import android.util.Log;
-
 /**
- * Created by zhe deng on 2025/10/23.
+ * JNI entry points for the streaming filesystem scanner.
+ *
+ * <p>The native scanner never returns a tree. It sends compact binary chunks
+ * through {@link Listener#onData(byte[], int)}. The Java implementation parses
+ * those chunks immediately and builds the final tree, so only one chunk plus
+ * one Java byte array exists at a time.</p>
  */
-public class ScanUtils {
-    private static final String TAG = "ScanUtils";
+public final class ScanUtils {
 
     static {
         System.loadLibrary("scan");
     }
 
-    public interface ScanCallback {
-        void onScanResult(String name);
+    private ScanUtils() {
     }
 
-
-    public static String scanDirectory(String path) {
-        StringBuilder sb = new StringBuilder();
-        scanDirectory(path, str -> {
-            Log.v(TAG, "scanDirectory: path: " + path + ", call: " + str);
-            sb.append(str);
-        });
-        Log.i(TAG, "scanDirectory: " + sb);
-        return sb.toString();
+    /**
+     * Receives binary scanner output. A chunk always ends at a record
+     * boundary; implementations may parse it without keeping a carry buffer.
+     */
+    public interface Listener {
+        void onData(byte[] data, int length);
     }
 
-    private static native void scanDirectory(String path, ScanCallback callback);
+    /**
+     * Scan {@code path} using {@code blockSize}-byte filesystem blocks.
+     *
+     * @return 0 on success, non-zero on failure
+     */
+    public static native int scanTree(String path, int blockSize,
+                                      Listener listener);
 }
-

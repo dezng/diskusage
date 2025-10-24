@@ -1001,9 +1001,9 @@ public class FileSystemEntry {
   }
 
   public final String absolutePath() {
-    if (this == null) {
+    if (parent == null) {
       // FIXME: to prevent crash appeared on some users.
-      return "";
+      return name;
     }
     if (this instanceof FileSystemRoot) {
       return ((FileSystemRoot)this).rootPath;
@@ -1247,4 +1247,13 @@ public class FileSystemEntry {
     return numFiles;
   }
 
+
+  @Override
+  public String toString() {
+    return "{" +
+            "\"name\":\"" + name +
+            "\",\"encodedSize\":" + encodedSize +
+            ",\"children\":" + Arrays.toString(children) +
+            '}';
+  }
 }

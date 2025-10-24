@@ -30,6 +30,7 @@ import android.content.DialogInterface.OnCancelListener;
 import android.content.DialogInterface.OnClickListener;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -131,7 +132,9 @@ public abstract class LoadableActivity extends Activity {
         String error;
         try {
           Log.d(TAG, "running scan for " + getKey());
+          final long start = SystemClock.elapsedRealtime();
           final FileSystemSuperRoot newRoot = scan();
+          Log.d(TAG, "scan " + getKey() + " run: cost: " + (SystemClock.elapsedRealtime() - start) + "ms");
 
           handler.post(new Runnable() {
             public void run() {

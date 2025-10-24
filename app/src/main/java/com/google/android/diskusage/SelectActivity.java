@@ -79,17 +79,33 @@ public class SelectActivity extends Activity {
       }
       startActivityForResult(i, 0);
     }
+    public void runAction2(String key, Class<?> viewer, boolean scanner) {
+      Intent i = new Intent(SelectActivity.this, viewer);
+      i.putExtra(DiskUsage.KEY_KEY, key);
+      i.putExtra(DiskUsage.SCANNER_KEY, !scanner);
+      Bundle bundle = bundles.get(key);
+      if (bundle != null) {
+        i.putExtra(DiskUsage.STATE_KEY, bundle);
+      }
+      startActivityForResult(i, 0);
+    }
   };
 
   private class DiskUsageAction extends AbstractUsageAction {
     private final MountPoint mountPoint;
+    private final boolean useNativeScanner;
 
     DiskUsageAction(MountPoint mountPoint) {
       this.mountPoint = mountPoint;
+      useNativeScanner = true;
+    }
+    DiskUsageAction(MountPoint mountPoint, boolean scanner) {
+      this.mountPoint = mountPoint;
+      useNativeScanner = !scanner;
     }
 
     public void run() {
-      runAction(mountPoint.getKey(), PermissionRequestActivity.class);
+      runAction2(mountPoint.getKey(), PermissionRequestActivity.class, !useNativeScanner);
     }
   };
 
@@ -204,6 +220,11 @@ public class SelectActivity extends Activity {
     for (MountPoint mountPoint : MountPoint.getMountPoints(this)) {
       options.add(mountPoint.getTitle());
       actionList.add(new DiskUsageAction(mountPoint));
+    }
+
+    for (MountPoint mountPoint : MountPoint.getMountPoints(this)) {
+      options.add(mountPoint.getTitle() + " force Scanner");
+      actionList.add(new DiskUsageAction(mountPoint, true));
     }
 
     if (/*debugUnhidden && */debugDataSourceBridge != null) {

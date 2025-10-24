@@ -5,44 +5,35 @@
 #ifndef DISKUSAGE_SCAN_H
 #define DISKUSAGE_SCAN_H
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <errno.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <dirent.h>
-#include <stdlib.h>
+#include <stddef.h>
 
+/*
+ * Streaming scanner.
+ *
+ * The native side never builds a directory tree. It walks the filesystem and
+ * writes compact binary records into a small fixed-size buffer. Whenever the
+ * buffer is full the callback receives a chunk. The Java side parses those
+ * records immediately and builds the final FileSystemEntry tree.
+ *
+ * This keeps native memory O(depth + one directory) instead of O(number of
+ * files), avoids one JNI call per entry, and lets the Java side report
+ * progress and cancel naturally.
+ *
+ * The callback returns 0 on success and non-zero to abort the scan.
+ */
+typedef int (*scan_stream_callback)(void *ctx, const char *data, size_t len);
 
-struct Entity {
-  long long sizeInBlocks;
-  long long sizeInBytes;
-  const char *name;
-  struct Entity *next;
-  char isdir;
-};
-
-
-typedef void (*scan_callback)(const char* output);
-
-
-void scan_tree(const char* path, scan_callback callback);
-void scan_dir(const char *path, struct Entity *entity, scan_callback callback);
-const char *getName(const char *path);
-void dump_file(struct Entity *entity, scan_callback callback);
-void dump(char type, scan_callback callback);
-const char *get_error();
-void dump_error(char type, const char *path,
-    long long sizeInBlocks, long long sizeInBytes, scan_callback callback);
-struct Entity *make_entity_internal(
-    const char *path,
-    struct stat *stbuf);
-struct Entity *make_entity(const char *path);
-char *makePath(const char *base, const char *name);
+/*
+ * Scan path and emit records through callback.
+ *
+ * blockSize is the filesystem block size from StatFs. st_blocks is measured
+ * in 512-byte units, so it is converted to filesystem blocks before being
+ * emitted.
+ *
+ * Returns 0 on success, non-zero if the callback aborted or an internal
+ * allocation failed.
+ */
+int scan_tree_stream(const char *path, int blockSize,
+                     scan_stream_callback callback, void *ctx);
 
 #endif //DISKUSAGE_SCAN_H
-
-
-
-
