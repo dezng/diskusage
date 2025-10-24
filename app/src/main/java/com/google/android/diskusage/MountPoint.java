@@ -97,7 +97,7 @@ public class MountPoint {
     init = true;
 
     for (PortableFile dir : DataSource.get().getExternalFilesDirs(context)) {
-      String path = dir.getAbsolutePath().replaceFirst("/Android/data/com.google.android.diskusage/files", "");
+      String path = dir.getAbsolutePath().replaceFirst("/Android/data/" + BuildConfig.APPLICATION_ID + "/files", "");
       Log.d(TAG, "mountpoint " + path);
       boolean internal = !dir.isExternalStorageRemovable();
       String title =  internal ? context.getString(R.string.storage_card) : path;

@@ -76,6 +76,7 @@ public class DiskUsage extends LoadableActivity {
   public static final int RESULT_DELETE_CONFIRMED = 10;
   public static final int RESULT_DELETE_CANCELED = 11;
 
+  public static final String SCANNER_KEY = "scanner";
   public static final String STATE_KEY = "state";
   public static final String KEY_KEY = "key";
 
