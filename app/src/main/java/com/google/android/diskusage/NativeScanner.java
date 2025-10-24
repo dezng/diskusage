@@ -188,6 +188,7 @@ public class NativeScanner implements ProgressGenerator {
   }
 
   FileSystemEntry scan(MountPoint mountPoint) throws IOException, InterruptedException {
+    Log.d(TAG, "scan() called with: mountPoint = [" + mountPoint + "]");
     is = DataSource.get().createNativeScanner(
         context, mountPoint.getRoot(), mountPoint.isRootRequired());
     while (getByte() != 0);

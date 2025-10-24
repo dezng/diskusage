@@ -113,4 +113,13 @@ public class MountPoint {
     init = false;
     RootMountPoint.reset();
   }
+
+  @Override
+  public String toString() {
+    return "MountPoint{" +
+            "title='" + title + '\'' +
+            ", root='" + root + '\'' +
+            ", forceHasApps=" + forceHasApps +
+            '}';
+  }
 }
