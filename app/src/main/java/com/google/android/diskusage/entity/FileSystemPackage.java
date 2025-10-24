@@ -26,6 +26,9 @@ import android.content.pm.ApplicationInfo;
 import android.util.Log;
 
 public class FileSystemPackage extends FileSystemEntry {
+
+  private final String TAG = getClass().getSimpleName();
+    
   public final String pkg;
   long codeSize;
   long dataSize;
@@ -93,19 +96,19 @@ public class FileSystemPackage extends FileSystemEntry {
     switch (type) {
       case CODE: codeSize -= child.getSizeInBlocks() * blockSize;
         if (codeSize < 0) {
-          Log.d("diskusage", "code size negative " + codeSize + " for " + pkg);
+          Log.d(TAG, "code size negative " + codeSize + " for " + pkg);
           codeSize = 0;
         }
         break;
       case DATA: dataSize -= child.getSizeInBlocks() * blockSize;
         if (dataSize < 0) {
-          Log.d("diskusage", "data size negative " + dataSize + " for " + pkg);
+          Log.d(TAG, "data size negative " + dataSize + " for " + pkg);
           dataSize = 0;
         }
         break;
       case CACHE: cacheSize -= child.getSizeInBlocks() * blockSize;
         if (cacheSize < 0) {
-          Log.d("diskusage", "cache size negative " + cacheSize + " for " + pkg);
+          Log.d(TAG, "cache size negative " + cacheSize + " for " + pkg);
           cacheSize = 0;
         }
         break;

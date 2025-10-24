@@ -41,6 +41,8 @@ import com.google.android.diskusage.entity.FileSystemEntry.ExcludeFilter;
 import com.google.android.diskusage.entity.FileSystemRoot;
 
 public class RootMountPoint extends MountPoint {
+  private static final String TAG = RootMountPoint.class.getSimpleName();
+
   private final String fsType;
 
   RootMountPoint(String root, String fsType) {
@@ -94,11 +96,11 @@ public class RootMountPoint extends MountPoint {
       String line;
       while ((line = reader.readLine()) != null) {
         checksum += line.length();
-        Log.d("diskusage", "line: " + line);
+        Log.d(TAG, "line: " + line);
         String[] parts = line.split(" +");
         if (parts.length < 3) continue;
         String mountPoint = parts[1];
-        Log.d("diskusage", "Mount point: " + mountPoint);
+        Log.d(TAG, "Mount point: " + mountPoint);
         String fsType = parts[2];
 
         if (!mountPoint.startsWith("/mnt/asec/")) {

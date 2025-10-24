@@ -46,6 +46,8 @@ import java.util.Arrays;
 
 public class FileSystemState {
 
+  private final String TAG = getClass().getSimpleName();
+
   public interface FileSystemView {
     /** Does nothing in GPU View. */
     public void requestRepaint();
@@ -274,9 +276,9 @@ public class FileSystemState {
         return false;
       }
 
-//      Log.d("diskusage", "multi: " + action + " num = " + num);
+//      Log.d(TAG, "multi: " + action + " num = " + num);
       if ((action & MotionEvent.ACTION_MASK) == MotionEvent.ACTION_POINTER_DOWN) {
-//        Log.d("diskusage", "multi down");
+//        Log.d(TAG, "multi down");
         multitouchReset = true;
         for (int i = 0; i < num; i++) {
           getFilterX(i).noFilter(ev.getX(i));
@@ -285,7 +287,7 @@ public class FileSystemState {
       }
 
       if (action == MotionEvent.ACTION_MOVE) {
-//        Log.d("diskusage", "multi move");
+//        Log.d(TAG, "multi move");
         float xmin, xmax, ymin, ymax;
         ymin = ymax = getFilterX(0).doFilter(ev.getY(0));
         xmin = xmax = getFilterY(0).doFilter(ev.getX(0));
@@ -298,7 +300,7 @@ public class FileSystemState {
           if (y > ymax) ymax = y;
         }
         if (multitouchReset) {
-//          Log.d("diskusage", "multi move: reset");
+//          Log.d(TAG, "multi move: reset");
           multitouchReset = false;
           multiNumTouches = num;
           touchMovement = true;
@@ -314,7 +316,7 @@ public class FileSystemState {
           if (dx < minDistanceX) dx = minDistanceX;
           touchWidth = dx / FileSystemEntry.elementWidth;
           touchPointX = viewDepth + avg_x / FileSystemEntry.elementWidth;
-          //            Log.d("diskusage", "multitouch reset " + avg_x + " : " + dx);
+          //            Log.d(TAG, "multitouch reset " + avg_x + " : " + dx);
           return true;
         }
         float dy = ymax - ymin;
@@ -337,7 +339,7 @@ public class FileSystemState {
 
         targetViewDepth = viewDepth = touchPointX - avg_x / FileSystemEntry.elementWidth;
         maxLevels = screenWidth / (float) FileSystemEntry.elementWidth;
-        //          Log.d("diskusage", "multitouch " + avg_x + " : " + dx + "(" + old_dx + ")");
+        //          Log.d(TAG, "multitouch " + avg_x + " : " + dx + "(" + old_dx + ")");
 
         long dt = (displayBottom - displayTop) / 41;
         if (dt < 2) {
@@ -515,7 +517,7 @@ public class FileSystemState {
       touchEntry = masterRoot.findEntry((int)touchDepth + 1, touchPoint);
       if (touchEntry == masterRoot) {
         touchEntry = null;
-        Log.d("diskusage", "warning: masterRoot selected in onTouchEvent");
+        Log.d(TAG, "warning: masterRoot selected in onTouchEvent");
       }
       speedX = 0;
       speedY = 0;
@@ -535,7 +537,7 @@ public class FileSystemState {
 
       if (!touchMovement) {
         if (touchEntry == null) {
-          Log.d("diskusage", "touchEntry == null");
+          Log.d(TAG, "touchEntry == null");
           return true;
         }
         if (masterRoot.depth(touchEntry) > (int)touchDepth + 1) return true;
@@ -781,15 +783,15 @@ public class FileSystemState {
   }
 
   public boolean onDrawGPU(RenderingThread rt) {
-    // Log.d("diskusage", "drawFrame (pre) viewTop = " + viewTop + " viewBottom = " + viewBottom);
+    // Log.d(TAG, "drawFrame (pre) viewTop = " + viewTop + " viewBottom = " + viewBottom);
 
     try {
       boolean animation = preDraw();
-      // Log.d("diskusage", "drawFrame viewTop = " + viewTop + " viewBottom = " + viewBottom);
+      // Log.d(TAG, "drawFrame viewTop = " + viewTop + " viewBottom = " + viewBottom);
       paintSlowGPU(rt, displayTop, displayBottom, viewDepth, screenWidth, screenHeight);
       return postDraw(animation);
     } catch (Throwable t) {
-      Log.d("DiskUsage", "Got exception", t);
+      Log.d(TAG, "Got exception", t);
     }
     return false;
   }
@@ -814,12 +816,12 @@ public class FileSystemState {
         requestRepaint();
       }
     } catch (Throwable t) {
-      Log.d("DiskUsage", "Got exception", t);
+      Log.d(TAG, "Got exception", t);
     }
   }
 
   public final void prepareMotion(long time) {
-//    Log.d("diskusage", "prepare motion");
+//    Log.d(TAG, "prepare motion");
     animationDuration = 900;
     prevViewDepth = viewDepth;
     prevViewTop = viewTop;
@@ -853,7 +855,7 @@ public class FileSystemState {
     prepareMotion(eventTime);
 
     if ((entry == masterRoot.children[0]) || (entry instanceof FileSystemFreeSpace)) {
-//      Log.d("diskusage", "special case for " + entry.name);
+//      Log.d(TAG, "special case for " + entry.name);
       toggleZoomState();
       return;
     }
@@ -864,7 +866,7 @@ public class FileSystemState {
     zoomFitToScreen(eventTime);
     boolean has_children = entry.children != null && entry.children.length != 0;
     if (!has_children) {
-//      Log.d("diskusage", "zoom file");
+//      Log.d(TAG, "zoom file");
       fullZoom = false;
       if (targetViewTop == prevViewTop
           && targetViewBottom == prevViewBottom) {
@@ -879,10 +881,10 @@ public class FileSystemState {
       }
       return;
     } else if (prevCursor == entry) {
-//      Log.d("diskusage", "zoom toggle same element");
+//      Log.d(TAG, "zoom toggle same element");
       fullZoom = !fullZoom;
     } else if (currDepth < prevDepth) {
-//      Log.d("diskusage", "zoom false");
+//      Log.d(TAG, "zoom false");
       fullZoom = false;
     } else {
       if (entry.getSizeForRendering() * yscale > FileSystemEntry.fontSize * 2) {
@@ -896,7 +898,7 @@ public class FileSystemState {
     float maxRequiredDepth = cursor.depth - (cursor.depth > 0 ? 1 : 0);
     float minRequiredDepth = cursor.depth + 1 + (has_children ? 1 : 0) - maxLevels;
     if (minRequiredDepth > maxRequiredDepth) {
-//      Log.d("diskusage", "zoom levels overlap, fullZoom = " + fullZoom);
+//      Log.d(TAG, "zoom levels overlap, fullZoom = " + fullZoom);
       if (fullZoom) {
         maxRequiredDepth = minRequiredDepth;
       } else {
@@ -930,30 +932,30 @@ public class FileSystemState {
 
   private final void zoomFitLabel(long eventTime) {
     if (cursor.position.getSizeForRendering() == 0) {
-      //Log.d("DiskUsage", "position is of zero size");
+      //Log.d(TAG, "position is of zero size");
       return;
     }
 
     float yscale = screenHeight / (float)(targetViewBottom - targetViewTop);
 
     if (cursor.position.getSizeForRendering() * yscale > FileSystemEntry.fontSize * 2 + 2) {
-      //Log.d("DiskUsage", "position large enough to contain label");
+      //Log.d(TAG, "position large enough to contain label");
     } else {
-      //Log.d("DiskUsage", "zoom in");
+      //Log.d(TAG, "zoom in");
       float new_yscale = FileSystemEntry.fontSize * 2.5f / cursor.position.getSizeForRendering();
       prepareMotion(eventTime);
 
       targetViewTop = targetViewBottom - (long) (screenHeight / new_yscale);
 
       if (targetViewTop > cursor.top) {
-        //Log.d("DiskUsage", "moving down to fit view after zoom in");
+        //Log.d(TAG, "moving down to fit view after zoom in");
         // 10% from top
         long offset = cursor.top - (long)(targetViewTop * 0.8 + targetViewBottom * 0.2);
         targetViewTop += offset;
         targetViewBottom += offset;
 
         if (targetViewTop < 0) {
-          //Log.d("DiskUsage", "at the top");
+          //Log.d(TAG, "at the top");
           targetViewBottom -= targetViewTop;
           targetViewTop = 0;
         }
@@ -963,14 +965,14 @@ public class FileSystemState {
 
   private final void zoomFitLabelMoveUp(long eventTime) {
     if (cursor.position.getSizeForRendering() == 0) {
-      //Log.d("DiskUsage", "position is of zero size");
+      //Log.d(TAG, "position is of zero size");
       return;
     }
 
     zoomFitLabel(eventTime);
 
     if (targetViewBottom < cursor.top + cursor.position.getSizeForRendering()) {
-      //Log.d("DiskUsage", "move up as needed");
+      //Log.d(TAG, "move up as needed");
       prepareMotion(eventTime);
 
       long offset = cursor.top + cursor.position.getSizeForRendering()
@@ -990,11 +992,11 @@ public class FileSystemState {
     if (targetViewTop < cursor.top &&
         targetViewBottom > cursor.top + cursor.position.getSizeForRendering()) {
 
-      // Log.d("DiskUsage", "fits in, no need for zoom out");
+      // Log.d(TAG, "fits in, no need for zoom out");
       return;
     }
 
-    //Log.d("DiskUsage", "zoom out");
+    //Log.d(TAG, "zoom out");
 
     prepareMotion(eventTime);
 
@@ -1105,7 +1107,7 @@ public class FileSystemState {
     }
 
     for (FileSystemEntry e : masterRoot.children[0].children) {
-      Log.d("diskusage", "entry = " + e.name + " " + e.getSizeInBlocks());
+      Log.d(TAG, "entry = " + e.name + " " + e.getSizeInBlocks());
     }
 
     if (freeSpace != null) {
@@ -1154,7 +1156,7 @@ public class FileSystemState {
   private final void fadeAwayEntry() {
     FileSystemEntry entry = deletingEntry;
     if (entry == null) return;
-//    Log.d("diskusage", "deletion in progress");
+//    Log.d(TAG, "deletion in progress");
 
     long time = SystemClock.uptimeMillis();
 
@@ -1162,17 +1164,17 @@ public class FileSystemState {
       deletingAnimationStartTime = time;
     }
     long dt = time - deletingAnimationStartTime;
-//    Log.d("diskusage", "dt = + " + dt);
+//    Log.d(TAG, "dt = + " + dt);
     if (dt > deletionAnimationDuration) {
       deleteDeletingEntry();
       return;
     }
     requestRepaint();
     float f = interpolator.getInterpolation(dt / (float) animationDuration);
-//    Log.d("diskusage", "f = + " + f);
+//    Log.d(TAG, "f = + " + f);
     long prevSize = entry.getSizeInBlocks();
     long newBlocks = (long)((1 - f) * deletingInitialSize);
-//    Log.d("diskusage", "newSize = + " + newSize);
+//    Log.d(TAG, "newSize = + " + newSize);
     long dSize = newBlocks - prevSize;
 
     if (dSize >= 0) return;
@@ -1309,7 +1311,7 @@ public class FileSystemState {
       return back();
     }*/
 
-    //Log.d("DiskUsage", "Key down = " + keyCode + " " + event);
+    //Log.d(TAG, "Key down = " + keyCode + " " + event);
     } finally {
       requestRepaintGPU();
     }
@@ -1328,7 +1330,7 @@ public class FileSystemState {
     MotionFilter.dx = (screenHeight + screenWidth) / 50;
 
     minDistance = screenHeight > screenWidth ? screenHeight /  10 : screenWidth / 10;
-    Log.d("diskusage", "screen = " + screenWidth + "x" + screenHeight);
+    Log.d(TAG, "screen = " + screenWidth + "x" + screenHeight);
     FileSystemEntry.elementWidth = targetElementWidth = (int) (screenWidth / maxLevels);
     setZoomState();
   }

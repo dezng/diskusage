@@ -39,6 +39,7 @@ import com.google.android.diskusage.entity.FileSystemPackage;
 import com.google.android.diskusage.entity.FileSystemSuperRoot;
 
 public abstract class LoadableActivity extends Activity {
+  private final String TAG = getClass().getSimpleName();
   FileSystemPackage pkg_removed;
 
   @Override
@@ -91,7 +92,7 @@ public abstract class LoadableActivity extends Activity {
       final AfterLoad runAfterLoad, boolean force) {
     boolean scanRunning = false;
     final PersistantActivityState state = getPersistantState();
-    Log.d("diskusage", "LoadFiles, afterLoad = " + runAfterLoad);
+    Log.d(TAG, "LoadFiles, afterLoad = " + runAfterLoad);
 
     if (force) {
       state.root = null;
@@ -104,7 +105,7 @@ public abstract class LoadableActivity extends Activity {
 
     scanRunning = state.afterLoad != null;
     state.afterLoad = runAfterLoad;
-    Log.d("diskusage", "created new progress dialog");
+    Log.d(TAG, "created new progress dialog");
     state.loading = new MyProgressDialog(activity);
 
     final MyProgressDialog thisLoading = state.loading;
@@ -129,16 +130,16 @@ public abstract class LoadableActivity extends Activity {
       public void run() {
         String error;
         try {
-          Log.d("diskusage", "running scan for " + getKey());
+          Log.d(TAG, "running scan for " + getKey());
           final FileSystemSuperRoot newRoot = scan();
 
           handler.post(new Runnable() {
             public void run() {
               if (state.loading == null) {
-                Log.d("diskusage", "no dialog, doesn't run afterLoad");
+                Log.d(TAG, "no dialog, doesn't run afterLoad");
                 state.afterLoad = null;
                 if (newRoot.children[0].children != null) {
-                  Log.d("diskusage", "no dialog, updating root still");
+                  Log.d(TAG, "no dialog, updating root still");
                   state.root = newRoot;
                 }
                 return;
@@ -147,16 +148,16 @@ public abstract class LoadableActivity extends Activity {
               state.loading = null;
               AfterLoad afterLoadCopy = state.afterLoad;
               state.afterLoad = null;
-              Log.d("diskusage", "dismissed dialog");
+              Log.d(TAG, "dismissed dialog");
 
               if (newRoot.children[0].children == null) {
-                Log.d("diskusage", "empty card");
+                Log.d(TAG, "empty card");
                 handleEmptySDCard(activity, runAfterLoad);
                 return;
               }
               state.root = newRoot;
               pkg_removed = null;
-              Log.d("diskusage", "run afterLoad = " + afterLoadCopy);
+              Log.d(TAG, "run afterLoad = " + afterLoadCopy);
               afterLoadCopy.run(state.root, false);
             }
           });
@@ -164,7 +165,7 @@ public abstract class LoadableActivity extends Activity {
         } catch (final OutOfMemoryError e) {
           state.root = null;
           state.afterLoad = null;
-          Log.d("DiskUsage", "out of memory!");
+          Log.d(TAG, "out of memory!");
           handler.post(new Runnable() {
             public void run() {
               if (state.loading == null) return;
@@ -188,7 +189,7 @@ public abstract class LoadableActivity extends Activity {
         final String finalError = error;
         state.root = null;
         state.afterLoad = null;
-        Log.d("DiskUsage", "exception in scan!");
+        Log.d(TAG, "exception in scan!");
         handler.post(new Runnable() {
           public void run() {
             if (state.loading == null) return;
@@ -212,7 +213,7 @@ public abstract class LoadableActivity extends Activity {
     PersistantActivityState state = getPersistantState();
     if (state.loading != null) {
       if (state.loading.isShowing()) state.loading.dismiss();
-      Log.d("diskusage", "removed progress dialog");
+      Log.d(TAG, "removed progress dialog");
       state.loading = null;
     }
     super.onPause();

@@ -40,6 +40,9 @@ import java.util.ArrayList;
 import java.util.PriorityQueue;
 
 public class Scanner implements DiskUsage.ProgressGenerator {
+
+  private final String TAG = getClass().getSimpleName();
+
   private final int maxdepth;
   private final int blockSize;
   private final int blockSizeIn512Bytes;
@@ -91,9 +94,9 @@ public class Scanner implements DiskUsage.ProgressGenerator {
     this.maxHeapSize = maxHeap;
 //    this.blockAllowance = (allocatedBlocks << FileSystemEntry.blockOffset) / 2;
 //    this.blockAllowance = (maxHeap / 2) * sizeThreshold;
-    Log.d("diskusage", "allocatedBlocks " + allocatedBlocks);
-    Log.d("diskusage", "maxHeap " + maxHeap);
-    Log.d("diskusage", "sizeThreshold = " + sizeThreshold / (float) (1 << FileSystemEntry.blockOffset));
+    Log.d(TAG, "allocatedBlocks " + allocatedBlocks);
+    Log.d(TAG, "maxHeap " + maxHeap);
+    Log.d(TAG, "sizeThreshold = " + sizeThreshold / (float) (1 << FileSystemEntry.blockOffset));
   }
 
   public FileSystemEntry scan(LegacyFile file) throws IOException {
@@ -127,8 +130,8 @@ public class Scanner implements DiskUsage.ProgressGenerator {
       list.parent.children = newChildren;
       extraHeap += list.heapSize;
     }
-    Log.d("diskusage", "allocated " + extraHeap + " B of extra heap");
-    Log.d("diskusage", "allocated " + (extraHeap + createdNodeSize) + " B total");
+    Log.d(TAG, "allocated " + extraHeap + " B of extra heap");
+    Log.d(TAG, "allocated " + (extraHeap + createdNodeSize) + " B total");
     return createdNode;
   }
 
@@ -158,7 +161,7 @@ public class Scanner implements DiskUsage.ProgressGenerator {
     try {
       listNames = file.list();
     } catch (SecurityException io) {
-      Log.d("diskusage", "list files", io);
+      Log.d(TAG, "list files", io);
     }
 
     if (listNames == null) return;
@@ -251,7 +254,7 @@ public class Scanner implements DiskUsage.ProgressGenerator {
 //        for(FileSystemEntry p = thisNode; p != null; p = p.parent) {
 //          hidden_path = p.name + "/" + hidden_path;
 //        }
-//        Log.d("diskusage", hidden_path + " = " + thisNodeSizeSmall);
+//        Log.d(TAG, hidden_path + " = " + thisNodeSizeSmall);
 
       makeNode(thisNode, msg);
       // create another one with right type

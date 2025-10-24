@@ -46,6 +46,9 @@ import java.util.Set;
 import java.util.TreeMap;
 
 public class SelectActivity extends Activity {
+
+  private static final String TAG = "SelectActivity";
+
   private AlertDialog dialog;
   Map<String,Bundle> bundles = new TreeMap<String,Bundle>();
   ArrayList<Runnable> actionList = new ArrayList<Runnable>();
@@ -61,7 +64,7 @@ public class SelectActivity extends Activity {
           "com.google.android.diskusage.datasource.debug.DebugDataSourceBridgeImpl");
       debugDataSourceBridge = (DebugDataSourceBridge) clazz.newInstance();
     } catch (Throwable t) {
-      Log.d("diskusage", "Debug is disabled");
+      Log.d(TAG, "Debug is disabled");
     }
   }
 
@@ -107,7 +110,7 @@ public class SelectActivity extends Activity {
         MountPoint.reset();
         makeDialog();
       } catch (IOException e) {
-        Log.d("diskusage", "Failed to enable debug", e);
+        Log.d(TAG, "Failed to enable debug", e);
         Toast.makeText(
             SelectActivity.this,
             "Failed to enable debug " + e.getMessage(),
@@ -139,7 +142,7 @@ public class SelectActivity extends Activity {
         MountPoint.reset();
         makeDialog();
       } catch (IOException e) {
-        Log.d("diskusage", "Failed to enable debug", e);
+        Log.d(TAG, "Failed to enable debug", e);
         Toast.makeText(
             SelectActivity.this,
             "Failed to enable debug " + e.getMessage(),
@@ -155,7 +158,7 @@ public class SelectActivity extends Activity {
         debugDataSourceBridge.saveDumpAndSendReport(
             debugDataSource, SelectActivity.this);
       } catch (IOException e) {
-        Log.d("diskusage", "Failed to send bugreport", e);
+        Log.d(TAG, "Failed to send bugreport", e);
         Toast.makeText(
             SelectActivity.this,
             "Failed to send bugreport: " + e.getMessage(),
@@ -178,7 +181,7 @@ public class SelectActivity extends Activity {
         }
         reader.close();
         if (checksum != RootMountPoint.checksum) {
-            Log.d("diskusage", checksum + " vs " + RootMountPoint.checksum);
+            Log.d(TAG, checksum + " vs " + RootMountPoint.checksum);
           reload = true;
         }
       } catch (Throwable t) {}

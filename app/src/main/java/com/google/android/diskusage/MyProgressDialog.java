@@ -38,6 +38,9 @@ import android.widget.TextView;
 import com.google.android.diskusage.entity.FileSystemEntry;
 
 public class MyProgressDialog extends AlertDialog {
+
+  private final String TAG = getClass().getSimpleName();
+    
   private final Context context;
   private TextView percentView;
   private TextView detailsView;
@@ -83,7 +86,7 @@ public class MyProgressDialog extends AlertDialog {
   char[] prevPathChars = new char[0];
 
   private String makePathString(String path) {
-//    Log.d("diskusage", "path = " + path);
+//    Log.d(TAG, "path = " + path);
     char[] pathChars = path.toCharArray();
     char[] prevPathChars = this.prevPathChars;
     int len = Math.min(pathChars.length, prevPathChars.length);
@@ -183,8 +186,8 @@ public class MyProgressDialog extends AlertDialog {
     tmp.setSpan(new StyleSpan(android.graphics.Typeface.BOLD),
         0, tmp.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
     percentView.setText(tmp);
-//    Log.d("diskusage", "details: " + details);
-//    Log.d("diskusage", "depth = " + depth);
+//    Log.d(TAG, "details: " + details);
+//    Log.d(TAG, "depth = " + depth);
     if (depth > 40 && !warned) {
       warned = true;
       setMessage("Cyclic dirs? Broken filesystem?");
@@ -194,7 +197,7 @@ public class MyProgressDialog extends AlertDialog {
   public void setProgress(long progress, FileSystemEntry entry) {
     this.progress = progress;
     this.details = makePathString(path(entry));
-//    Log.d("diskusage", "makePath = " + this.details);
+//    Log.d(TAG, "makePath = " + this.details);
     onProgressChanged();
   }
 

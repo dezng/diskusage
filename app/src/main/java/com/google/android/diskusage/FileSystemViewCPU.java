@@ -11,6 +11,9 @@ import com.google.android.diskusage.FileSystemState.FileSystemView;
 import com.google.android.diskusage.entity.FileSystemEntry;
 
 public final class FileSystemViewCPU extends View implements FileSystemView {
+
+  private final String TAG = getClass().getSimpleName();
+    
   private final FileSystemState eventHandler;
   
   public FileSystemViewCPU(DiskUsage context,
@@ -25,7 +28,7 @@ public final class FileSystemViewCPU extends View implements FileSystemView {
 
   @Override
   public final boolean onTouchEvent(MotionEvent ev) {
-    Log.d("diskusage", "touch = " + ev.getX() + ":" + ev.getY());
+    Log.d(TAG, "touch = " + ev.getX() + ":" + ev.getY());
     eventHandler.onTouchEvent(
         eventHandler.multitouchHandler.newMyMotionEvent(ev));
     return true;

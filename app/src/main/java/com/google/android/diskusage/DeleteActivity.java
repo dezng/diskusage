@@ -32,6 +32,7 @@ import com.google.android.diskusage.delete.FileInfoAdapter;
 import com.google.android.diskusage.entity.FileSystemEntry;
 
 public class DeleteActivity extends Activity {
+  private final String TAG = getClass().getSimpleName();
   public static final String NUM_FILES_KEY = "numFiles";
   public static final String SIZE_KEY = "size";
 
@@ -45,7 +46,7 @@ public class DeleteActivity extends Activity {
         DiskUsage.DELETE_PATH_KEY);
     final String absolutePath = getIntent().getStringExtra(
         DiskUsage.DELETE_ABSOLUTE_PATH_KEY);
-    Log.d("diskusage", "DeleteActivity: " + path + " -> " + absolutePath);
+    Log.d(TAG, "DeleteActivity: " + path + " -> " + absolutePath);
 
     setContentView(R.layout.delete_view);
     ListView lv = (ListView) findViewById(R.id.list);

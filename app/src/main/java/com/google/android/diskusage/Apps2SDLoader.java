@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Set;
 
 public class Apps2SDLoader {
+  private final String TAG = getClass().getSimpleName();
 
   private final DiskUsage diskUsage;
   private CharSequence lastAppName = "";
@@ -60,7 +61,7 @@ public class Apps2SDLoader {
 
     final List<UsageStats> queryUsageStats=usageStatsManager.queryUsageStats(
             UsageStatsManager.INTERVAL_YEARLY, 0 ,System.currentTimeMillis());
-    Log.d("diskusage", "stats size = " + queryUsageStats.size());
+    Log.d(TAG, "stats size = " + queryUsageStats.size());
     StorageStatsManager storageStatsManager = (StorageStatsManager) diskUsage.getSystemService(Context.STORAGE_STATS_SERVICE);
     final ArrayList<FileSystemEntry> entries = new ArrayList<FileSystemEntry>();
     PackageManager packageManager = diskUsage.getApplicationContext().getPackageManager();
@@ -93,14 +94,14 @@ public class Apps2SDLoader {
 
 
     for (String pkg : packages) {
-      Log.d("diskusage", "app: " + pkg);
+      Log.d(TAG, "app: " + pkg);
       try {
         ApplicationInfo metadata = packageManager.getApplicationInfo(pkg, PackageManager.GET_META_DATA);
         String appName = metadata.loadLabel(packageManager).toString();
         lastAppName = appName;
         StorageStats stats = storageStatsManager.queryStatsForPackage(
                 StorageManager.UUID_DEFAULT, pkg, android.os.Process.myUserHandle());
-        Log.d("diskusage", "stats: " + stats.getAppBytes() + " " + stats.getDataBytes());
+        Log.d(TAG, "stats: " + stats.getAppBytes() + " " + stats.getDataBytes());
         FileSystemPackage p = new FileSystemPackage(
                 appName,
                 pkg,
@@ -112,7 +113,7 @@ public class Apps2SDLoader {
         entries.add(p);
         numLoadedPackages++;
       } catch (PackageManager.NameNotFoundException e) {
-        Log.d("diskusage", "Failed to get package", e);
+        Log.d(TAG, "Failed to get package", e);
       }
     }
 

@@ -34,6 +34,9 @@ import com.google.android.diskusage.entity.FileSystemEntrySmall;
 import com.google.android.diskusage.entity.FileSystemFile;
 
 public class NativeScanner implements ProgressGenerator {
+
+  private final String TAG = getClass().getSimpleName();
+
   private final int blockSize;
   private final int blockSizeIn512Bytes;
   private final long sizeThreshold;
@@ -85,7 +88,7 @@ public class NativeScanner implements ProgressGenerator {
   private final byte[] buffer = new byte[bufsize];
 
   private void move() {
-//    Log.d("diskusage", "MOVE!");
+//    Log.d(TAG, "MOVE!");
     if (offset == 0) throw new RuntimeException("Error: too large entity size");
     System.arraycopy(buffer, offset, buffer, 0, allocated - offset);
     allocated -= offset;
@@ -93,7 +96,7 @@ public class NativeScanner implements ProgressGenerator {
   }
 
   public void read() throws IOException {
-//    Log.d("diskusage", "READ!");
+//    Log.d(TAG, "READ!");
     if (allocated == bufsize) {
       move();
     }
@@ -120,7 +123,7 @@ public class NativeScanner implements ProgressGenerator {
       if (b < '0' || b > '9') throw new RuntimeException("Error: number format error");
       res = res * 10 + (b - '0');
     }
-//    Log.d("diskusage", "long = " + res);
+//    Log.d(TAG, "long = " + res);
     return res;
   }
 
@@ -134,7 +137,7 @@ public class NativeScanner implements ProgressGenerator {
         if (buffer[i] == 0) {
           String res = new String(buffer, offset, i - offset, "UTF-8");
           offset = i + 1;
-//          Log.d("diskusage", "string = " + res);
+//          Log.d(TAG, "string = " + res);
           return res;
         }
       }
@@ -152,7 +155,7 @@ public class NativeScanner implements ProgressGenerator {
 
   public Type getType() throws IOException {
     int c = getByte();
-//    Log.d("diskusage", "type = " + (char)c);
+//    Log.d(TAG, "type = " + (char)c);
     switch (c) {
     case 'D': return Type.DIR;
     case 'F': return Type.FILE;
@@ -169,9 +172,9 @@ public class NativeScanner implements ProgressGenerator {
     this.context = context;
 //    this.blockAllowance = (allocatedBlocks << FileSystemEntry.blockOffset) / 2;
 //    this.blockAllowance = (maxHeap / 2) * sizeThreshold;
-    Log.d("diskusage", "allocatedBlocks " + allocatedBlocks);
-    Log.d("diskusage", "maxHeap " + maxHeap);
-    Log.d("diskusage", "sizeThreshold = " + sizeThreshold / (float) (1 << FileSystemEntry.blockOffset));
+    Log.d(TAG, "allocatedBlocks " + allocatedBlocks);
+    Log.d(TAG, "maxHeap " + maxHeap);
+    Log.d(TAG, "sizeThreshold = " + sizeThreshold / (float) (1 << FileSystemEntry.blockOffset));
   }
 
   private void print(String msg, SmallList list) {
@@ -180,7 +183,7 @@ public class NativeScanner implements ProgressGenerator {
     for(FileSystemEntry p = list.parent; p != null; p = p.parent) {
       hidden_path = p.name + "/" + hidden_path;
     }
-    Log.d("diskusage", msg + " " + hidden_path + " = " + list.heapSize + " " + list.spaceEfficiency);
+    Log.d(TAG, msg + " " + hidden_path + " = " + list.heapSize + " " + list.spaceEfficiency);
   }
 
   FileSystemEntry scan(MountPoint mountPoint) throws IOException, InterruptedException {
@@ -191,7 +194,7 @@ public class NativeScanner implements ProgressGenerator {
     Type type = getType();
     if (type != Type.DIR) throw new RuntimeException("Error: no mount point");
     scanDirectory(null, getString(), 0);
-    Log.d("diskusage", "allocated " + createdNodeSize + " B of heap");
+    Log.d(TAG, "allocated " + createdNodeSize + " B of heap");
 
     int extraHeap = 0;
 
@@ -214,8 +217,8 @@ public class NativeScanner implements ProgressGenerator {
       list.parent.children = newChildren;
       extraHeap += list.heapSize;
     }
-    Log.d("diskusage", "allocated " + extraHeap + " B of extra heap");
-    Log.d("diskusage", "allocated " + (extraHeap + createdNodeSize) + " B total");
+    Log.d(TAG, "allocated " + extraHeap + " B of extra heap");
+    Log.d(TAG, "allocated " + (extraHeap + createdNodeSize) + " B total");
     if (offset != allocated) throw new RuntimeException("Error: extra data, " + (allocated - offset) + " bytes");
     is.close();
     return createdNode;
@@ -310,7 +313,7 @@ public class NativeScanner implements ProgressGenerator {
             createdNode.initSizeInBytesAndBlocks(childBytes, childBlocks, blockSize);
             pos += createdNode.getSizeInBlocks();
             lastCreatedFile = createdNode;
-            //Log.d("diskusage", createdNode.path2());
+            //Log.d(TAG, createdNode.path2());
           } else {
             // directory
             SoftStack new_s = new SoftStack();
@@ -474,7 +477,7 @@ public class NativeScanner implements ProgressGenerator {
         createdNode.initSizeInBytesAndBlocks(childBytes, childBlocks, blockSize);
         pos += createdNode.getSizeInBlocks();
         lastCreatedFile = createdNode;
-//        Log.d("diskusage", createdNode.path2());
+//        Log.d(TAG, createdNode.path2());
       } else {
         // directory
         scanDirectory(thisNode, getString(), depth + 1);
@@ -525,7 +528,7 @@ public class NativeScanner implements ProgressGenerator {
 //        for(FileSystemEntry p = thisNode; p != null; p = p.parent) {
 //          hidden_path = p.name + "/" + hidden_path;
 //        }
-//        Log.d("diskusage", hidden_path + " = " + thisNodeSizeSmall);
+//        Log.d(TAG, hidden_path + " = " + thisNodeSizeSmall);
 
       makeNode(thisNode, msg);
       // create another one with right type

@@ -39,6 +39,8 @@ import com.google.android.diskusage.opengl.DrawingCache;
 import com.google.android.diskusage.opengl.RenderingThread;
 
 public class FileSystemEntry {
+
+  private final String TAG = getClass().getSimpleName();
   private static final Paint bg = new Paint();
   private static final Paint bg_emptySpace = new Paint();
   private static final Paint cursor_fg = new Paint();
@@ -455,8 +457,8 @@ public class FileSystemEntry {
 
       float top = yoffset;
       float bottom = top + csize * yscale;
-      ///Log.d("DiskUsage", "child: child_clip_y0 = " + child_clip_y0);
-      ///Log.d("DiskUsage", "child: child_clip_y1 = " + child_clip_y1);
+      ///Log.d(TAG, "child: child_clip_y0 = " + child_clip_y0);
+      ///Log.d(TAG, "child: child_clip_y1 = " + child_clip_y1);
 
       if (child_clipTop > csize) {
 
@@ -467,7 +469,7 @@ public class FileSystemEntry {
       }
 
       if (child_clipBottom < 0) {
-        ///Log.d("DiskUsage", "skipped rest starting from " + c.name);
+        ///Log.d(TAG, "skipped rest starting from " + c.name);
         return;
       }
 
@@ -568,8 +570,8 @@ public class FileSystemEntry {
 
       float top = yoffset;
       float bottom = top + csize * yscale;
-      ///Log.d("DiskUsage", "child: child_clip_y0 = " + child_clip_y0);
-      ///Log.d("DiskUsage", "child: child_clip_y1 = " + child_clip_y1);
+      ///Log.d(TAG, "child: child_clip_y0 = " + child_clip_y0);
+      ///Log.d(TAG, "child: child_clip_y1 = " + child_clip_y1);
 
       if (child_clipTop > csize) {
 
@@ -580,7 +582,7 @@ public class FileSystemEntry {
       }
 
       if (child_clipBottom < 0) {
-        ///Log.d("DiskUsage", "skipped rest starting from " + c.name);
+        ///Log.d(TAG, "skipped rest starting from " + c.name);
         return;
       }
 
@@ -653,8 +655,8 @@ public class FileSystemEntry {
 
       float top = yoffset;
       float bottom = top + csize * yscale;
-      ///Log.d("DiskUsage", "child: child_clip_y0 = " + child_clip_y0);
-      ///Log.d("DiskUsage", "child: child_clip_y1 = " + child_clip_y1);
+      ///Log.d(TAG, "child: child_clip_y0 = " + child_clip_y0);
+      ///Log.d(TAG, "child: child_clip_y1 = " + child_clip_y1);
 
       if (child_clipTop > csize) {
 
@@ -665,7 +667,7 @@ public class FileSystemEntry {
       }
 
       if (child_clipBottom < 0) {
-        ///Log.d("DiskUsage", "skipped rest starting from " + c.name);
+        ///Log.d(TAG, "skipped rest starting from " + c.name);
         return;
       }
 
@@ -751,8 +753,8 @@ public class FileSystemEntry {
 
       float top = yoffset;
       float bottom = top + csize * yscale;
-      ///Log.d("DiskUsage", "child: child_clip_y0 = " + child_clip_y0);
-      ///Log.d("DiskUsage", "child: child_clip_y1 = " + child_clip_y1);
+      ///Log.d(TAG, "child: child_clip_y0 = " + child_clip_y0);
+      ///Log.d(TAG, "child: child_clip_y1 = " + child_clip_y1);
 
       if (child_clipTop > csize) {
 
@@ -763,7 +765,7 @@ public class FileSystemEntry {
       }
 
       if (child_clipBottom < 0) {
-        ///Log.d("DiskUsage", "skipped rest starting from " + c.name);
+        ///Log.d(TAG, "skipped rest starting from " + c.name);
         return;
       }
 
@@ -1035,11 +1037,11 @@ public class FileSystemEntry {
     long currOffset = 0;
     FileSystemEntry entry = this;
     FileSystemEntry[] children0 = children;
-    // Log.d("DiskUsage", "Starting entry search at " + entry.name);
+    // Log.d(TAG, "Starting entry search at " + entry.name);
 
     for (int depth = 0; depth < maxDepth; depth++) {
       int nchildren = children0.length;
-      // Log.d("DiskUsage", "  Entry = " + entry.name);
+      // Log.d(TAG, "  Entry = " + entry.name);
       for (int c = 0; c < nchildren; c++) {
         FileSystemEntry e = children0[c];
         long size = e.getSizeForRendering();
@@ -1070,11 +1072,11 @@ public class FileSystemEntry {
     FileSystemEntry dir;
     FileSystemEntry root = this;
 
-//    Log.d("diskusage", "getOffset()");
+//    Log.d(TAG, "getOffset()");
 
     while (cursor != root) {
-//      Log.d("diskusage", "cursor = " + (cursor != null) + " root = " + (root != null));
-//      Log.d("diskusage", "cursor = " + cursor.name + " root = " + root.name);
+//      Log.d(TAG, "cursor = " + (cursor != null) + " root = " + (root != null));
+//      Log.d(TAG, "cursor = " + cursor.name + " root = " + root.name);
       dir = cursor.parent;
       FileSystemEntry[] children = dir.children;
       int len = children.length;
@@ -1140,7 +1142,7 @@ public class FileSystemEntry {
    * @param exactMatch TODO
    */
   public FileSystemEntry getEntryByName(String path, boolean exactMatch) {
-    Log.d("diskusage", "getEntryForName = " + path);
+    Log.d(TAG, "getEntryForName = " + path);
     String[] pathElements = path.split("/");
     FileSystemEntry entry = this;
 

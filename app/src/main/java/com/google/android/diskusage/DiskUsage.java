@@ -69,6 +69,8 @@ import java.util.List;
 
 public class DiskUsage extends LoadableActivity {
 
+  private final String TAG = getClass().getSimpleName();
+
   // FIXME: wrap to direct requests to rendering thread
   protected FileSystemState fileSystemState;
   public static final int RESULT_DELETE_CONFIRMED = 10;
@@ -89,7 +91,7 @@ public class DiskUsage extends LoadableActivity {
   @Override
   protected void onCreate(Bundle icicle) {
     super.onCreate(icicle);
-    Log.d("diskusage", "onCreate()");
+    Log.d(TAG, "onCreate()");
     setContentView(new TextView(this));
     menu.onCreate();
     Intent i = getIntent();
@@ -108,7 +110,7 @@ public class DiskUsage extends LoadableActivity {
       finish();
       return;
     }
-    Log.d("diskusage", "onCreate, rootPath = " + mountPoint.getRoot() + " receivedState = " + receivedState);
+    Log.d(TAG, "onCreate, rootPath = " + mountPoint.getRoot() + " receivedState = " + receivedState);
     if (receivedState != null) onRestoreInstanceState(receivedState);
   }
 
@@ -203,7 +205,7 @@ public class DiskUsage extends LoadableActivity {
       try {
         final String APP_PKG_PREFIX = "com.android.settings.";
         final String APP_PKG_NAME = APP_PKG_PREFIX+"ApplicationPkgName";
-        Log.d("diskusage", "show package = " + pkg);
+        Log.d(TAG, "show package = " + pkg);
         Intent viewIntent = new Intent(Intent.ACTION_VIEW);
         viewIntent.setComponent(new ComponentName(
             "com.android.settings", "com.android.settings.InstalledAppDetails"));
@@ -221,7 +223,7 @@ public class DiskUsage extends LoadableActivity {
   private final class GingerbreadPackageViewer extends VersionedPackageViewer {
     @Override
     void viewPackage(String pkg) {
-      Log.d("diskusage", "show package = " + pkg);
+      Log.d(TAG, "show package = " + pkg);
       Intent viewIntent = new Intent(
           Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
           Uri.parse("package:" + pkg));
@@ -251,7 +253,7 @@ public class DiskUsage extends LoadableActivity {
   public void askForDeletion(final FileSystemEntry entry) {
     final String path = entry.path2();
     final String fullPath = entry.absolutePath();
-    Log.d("DiskUsage", "Deletion requested for " + path);
+    Log.d(TAG, "Deletion requested for " + path);
 
     if (entry instanceof FileSystemEntrySmall) {
       Toast.makeText(this,
@@ -411,13 +413,13 @@ public class DiskUsage extends LoadableActivity {
 
     String fileName = entry.name;
     int dot = fileName.lastIndexOf(".");
-    Log.d("diskusage", "name: " + fileName + " path: " + path + " dot: " + dot);
+    Log.d(TAG, "name: " + fileName + " path: " + path + " dot: " + dot);
     if (dot != -1) {
       String extension = fileName.substring(dot + 1).toLowerCase();
 
       MimeTypeMap mimeTypeMap = MimeTypeMap.getSingleton();
       String mime = mimeTypeMap.getMimeTypeFromExtension(extension);
-      Log.d("diskusage", "extension: " + extension + " mime: " + mime);
+      Log.d(TAG, "extension: " + extension + " mime: " + mime);
 
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
         uri = FileProvider.getUriForFile(this, BuildConfig.APPLICATION_ID + ".provider", file);
@@ -489,7 +491,7 @@ public class DiskUsage extends LoadableActivity {
 
   @Override
   protected void onRestoreInstanceState(final Bundle inState) {
-    Log.d("diskusage", "onRestoreInstanceState, rootPath = " + inState.getString(KEY_KEY));
+    Log.d(TAG, "onRestoreInstanceState, rootPath = " + inState.getString(KEY_KEY));
 
     if (fileSystemState != null)
       fileSystemState.restoreStateInRenderThread(inState);

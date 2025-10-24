@@ -35,6 +35,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 public class BackgroundDelete extends Thread {
+  private final String TAG = getClass().getSimpleName();
   ProgressDialog dialog;
   File file;
   String path;
@@ -154,7 +155,7 @@ public class BackgroundDelete extends Thread {
   }
 
   public void restore() {
-    Log.d("DiskUsage", "restore started for " + path);
+    Log.d(TAG, "restore started for " + path);
     MountPoint mountPoint = MountPoint.getForKey(diskUsage, diskUsage.getKey());
     int displayBlockSize = diskUsage.fileSystemState.masterRoot.getDisplayBlockSize();
     try {
@@ -165,15 +166,15 @@ public class BackgroundDelete extends Thread {
       // FIXME: may be problems in case of two deletions
       entry.parent.insert(newEntry, displayBlockSize);
       diskUsage.fileSystemState.restore(newEntry);
-      Log.d("DiskUsage", "restoring undeleted: "
+      Log.d(TAG, "restoring undeleted: "
               + newEntry.name + " " + newEntry.sizeString());
     } catch (IOException e) {
-      Log.d("diskusage", "Failed to restore");
+      Log.d(TAG, "Failed to restore");
     }
   }
 
   public void notifyUser() {
-    Log.d("DiskUsage", "Delete: status = " + deletionStatus
+    Log.d(TAG, "Delete: status = " + deletionStatus
         + " directories " + numDeletedDirectories
         + " files " + numDeletedFiles);
 

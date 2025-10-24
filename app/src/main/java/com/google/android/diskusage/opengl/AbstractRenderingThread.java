@@ -13,6 +13,8 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 
 public abstract class AbstractRenderingThread extends Thread {
+  private final String TAG = getClass().getSimpleName();
+
   public abstract boolean renderFrame(GL10 gl);
   public abstract void sizeChanged(GL10 gl, int w, int h);
   public abstract void createResources(GL10 gl);
@@ -66,10 +68,9 @@ public abstract class AbstractRenderingThread extends Thread {
       }
       
     } catch (ExitException e) {
-      Log.d("diskusage", "rendering thread exited cleanly");
+      Log.d(TAG, "rendering thread exited cleanly");
     } catch (InterruptedException e) {
-      Log.d("diskusage", "rendering thread was interrupted");
-
+      Log.d(TAG, "rendering thread was interrupted");
     }
   }
   
@@ -80,7 +81,7 @@ public abstract class AbstractRenderingThread extends Thread {
       synchronized (events) {
         if (events.isEmpty()) {
           if (stopRenderingThread && !surfaceAvailable) {
-            Log.d("diskusage", "*** Rendering thread is about to finish. ***");
+            Log.d(TAG, "*** Rendering thread is about to finish. ***");
             throw new ExitException();
           }
           if (surfaceAvailable  && sizeInitialized && !stopRenderingThread
@@ -185,7 +186,7 @@ public abstract class AbstractRenderingThread extends Thread {
     }
     
     public void initSurface(SurfaceHolder holder) {
-      Log.d("diskusage", "*** init surface ****");
+      Log.d(TAG, "*** init surface ****");
       
       // Note: I haven't found how to avoid race condition with surfaceCreated
       // and surfaceDestroyed in SurfaceHolder.Callback and the renderer thread.
@@ -198,7 +199,7 @@ public abstract class AbstractRenderingThread extends Thread {
     }
     
     public void destroySurface(SurfaceHolder holder) {
-      Log.d("diskusage", "*** destroy surface ***");
+      Log.d(TAG, "*** destroy surface ***");
       try {
         egl.eglMakeCurrent(eglDisplay, EGL10.EGL_NO_SURFACE,
             EGL10.EGL_NO_SURFACE,

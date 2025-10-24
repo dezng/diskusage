@@ -32,6 +32,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class MountPoint {
+  private static final String TAG = MountPoint.class.getSimpleName();
+
   private String title;
   private final String root;
   private final boolean forceHasApps;
@@ -96,7 +98,7 @@ public class MountPoint {
 
     for (PortableFile dir : DataSource.get().getExternalFilesDirs(context)) {
       String path = dir.getAbsolutePath().replaceFirst("/Android/data/com.google.android.diskusage/files", "");
-      Log.d("diskusage", "mountpoint " + path);
+      Log.d(TAG, "mountpoint " + path);
       boolean internal = !dir.isExternalStorageRemovable();
       String title =  internal ? context.getString(R.string.storage_card) : path;
       MountPoint mountPoint = new MountPoint(title, path, internal);

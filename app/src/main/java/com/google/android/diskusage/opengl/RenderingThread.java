@@ -27,6 +27,8 @@ import com.google.android.diskusage.entity.FileSystemEntry;
 
 
 public class RenderingThread extends AbstractRenderingThread {
+
+  private final String TAG = getClass().getSimpleName();
   private Context context;
   private FileSystemState eventHandler;
   
@@ -101,7 +103,7 @@ public class RenderingThread extends AbstractRenderingThread {
     int min = Math.min(width, height);
     float minInch = min / dpi; // my tablet: 5 inch height
                                // my phone: 2 inc width
-    Log.d("diskusage", "screen inch = " + minInch);
+    Log.d(TAG, "screen inch = " + minInch);
     
     float defaultSize = textPaint.getTextSize();
     textPaint.setTextSize(20);
@@ -488,19 +490,19 @@ public class RenderingThread extends AbstractRenderingThread {
   public void nextBitmapMap() {
     currentBitmapMap.commit();
     if (bitmaps.size() >= 40 && hasReusableBitmap()) {
-//      Log.d("diskusage", "get least used bitmap, bitmaps = 5");
+//      Log.d(TAG, "get least used bitmap, bitmaps = 5");
       currentBitmapMap = getLeastUsedBitmap();
       return;
     }
     
 //    float bitmapUsage = bitmaps.get(0).last_usage / max_usage;
 //    if (bitmapUsage < 0.2 && hasReusableBitmap()) {
-////      Log.d("diskusage", "get least used bitmap, usage = " + bitmapUsage);
+////      Log.d(TAG, "get least used bitmap, usage = " + bitmapUsage);
 //      currentBitmapMap = getLeastUsedBitmap();
 //      return;
 //    }
     
-//    Log.d("diskusage", "new bitmap");
+//    Log.d(TAG, "new bitmap");
     currentBitmapMap = new BitmapMap();
   }
   
@@ -671,13 +673,13 @@ public class RenderingThread extends AbstractRenderingThread {
 
   @Override
   public void createResources(GL10 gl) {
-    Log.d("diskusage", "***** surface created *****");
+    Log.d(TAG, "***** surface created *****");
     // Load textures
     LoadTextures(gl);
   }
   
   public void releaseResources(GL10 gl) {
-    Log.d("diskusage", "***** surface destroyed *****");
+    Log.d(TAG, "***** surface destroyed *****");
     for (BitmapMap bitmap : bitmaps) {
       bitmap.destroy();
     }
@@ -687,7 +689,7 @@ public class RenderingThread extends AbstractRenderingThread {
   
   @Override
   public void sizeChanged(GL10 gl, int width, int height) {
-    Log.d("diskusage", "***** surface size changed       *****");
+    Log.d(TAG, "***** surface size changed       *****");
 //    FileSystemEntry.elementWidth = 100;// FIXME??;
 //    FileSystemEntry.fontSize = 20; // FIXME
     eventHandler.layout(true, 0, 0, width, height, width, height);
@@ -696,7 +698,7 @@ public class RenderingThread extends AbstractRenderingThread {
     gl.glHint(GL10.GL_PERSPECTIVE_CORRECTION_HINT,
         GL10.GL_FASTEST);
     gl.glViewport(0, 0, width, height);
-    Log.d("diskusage", "updated viewport = " + width + "x" + height);
+    Log.d(TAG, "updated viewport = " + width + "x" + height);
     
     
     gl.glMatrixMode(GL10.GL_PROJECTION);
