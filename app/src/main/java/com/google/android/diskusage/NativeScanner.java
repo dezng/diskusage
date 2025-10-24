@@ -172,6 +172,7 @@ public class NativeScanner implements ProgressGenerator {
     this.context = context;
 //    this.blockAllowance = (allocatedBlocks << FileSystemEntry.blockOffset) / 2;
 //    this.blockAllowance = (maxHeap / 2) * sizeThreshold;
+    Log.d("diskusage", "native scanner.");
     Log.d(TAG, "allocatedBlocks " + allocatedBlocks);
     Log.d(TAG, "maxHeap " + maxHeap);
     Log.d(TAG, "sizeThreshold = " + sizeThreshold / (float) (1 << FileSystemEntry.blockOffset));
@@ -221,6 +222,8 @@ public class NativeScanner implements ProgressGenerator {
     Log.d(TAG, "allocated " + (extraHeap + createdNodeSize) + " B total");
     if (offset != allocated) throw new RuntimeException("Error: extra data, " + (allocated - offset) + " bytes");
     is.close();
+
+    Log.d("diskusage", "native scanner done.");
     return createdNode;
   }
 

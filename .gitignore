@@ -5,3 +5,6 @@
 /local.properties
 /DiskUsage.iml
 /app/app.iml
+
+.cxx
+.idea
