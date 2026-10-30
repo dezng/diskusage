@@ -60,7 +60,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DiskUsage extends LoadableActivity {
 
@@ -703,90 +705,82 @@ public class DiskUsage extends LoadableActivity {
     }
   }
 
-  void moveIntoPackage(FileSystemPackage pkg, FileSystemRoot root, String path, String newName, FileSystemPackage.ChildType type, int blockSize) {
-    FileSystemEntry e = root.getByAbsolutePath(path);
-    if (e != null) {
-      e.remove(blockSize);
-      FileSystemRoot newRoot = FileSystemRoot.makeNode(newName, path, true);
-      newRoot.setChildren(e.children, blockSize);
-      pkg.addPublicChild(newRoot, type, blockSize);
+  void moveIntoPackage(FileSystemPackage pkg, FileSystemEntry entry,
+                       String newName, FileSystemPackage.ChildType type, int blockSize) {
+    if (entry == null) {
+      return;
     }
+    String path = entry.absolutePath();
+    entry.remove(blockSize);
+    FileSystemRoot newRoot = FileSystemRoot.makeNode(newName, path, true);
+    newRoot.setChildren(entry.children, blockSize);
+    pkg.addPublicChild(newRoot, type, blockSize);
   }
 
+  private static FileSystemEntry childNamed(FileSystemEntry parent, String name) {
+    if (parent == null || parent.children == null) {
+      return null;
+    }
+    for (FileSystemEntry child : parent.children) {
+      if (name.equals(child.name)) {
+        return child;
+      }
+    }
+    return null;
+  }
+
+  private static Map<String, FileSystemEntry> indexByName(FileSystemEntry parent) {
+    if (parent == null || parent.children == null || parent.children.length == 0) {
+      return Collections.emptyMap();
+    }
+    Map<String, FileSystemEntry> index =
+        new HashMap<>(parent.children.length * 2);
+    for (FileSystemEntry child : parent.children) {
+      index.put(child.name, child);
+    }
+    return index;
+  }
+
+  /**
+   * Moves the external app directories discovered by the media scan into the
+   * corresponding app entries. Only the external tree needs to be searched:
+   * the internal /data tree is not part of this view.
+   *
+   * <p>The previous implementation rebuilt and re-resolved the full path for
+   * every app and every directory type, which was O(apps^2) and produced a
+   * large amount of debug logging. Index the three Android subdirectories once
+   * and do a single pass over the installed apps instead.</p>
+   */
   void moveAppData(FileSystemEntry[] apps, FileSystemRoot media, int blockSize) {
-    String diskusage = BuildConfig.APPLICATION_ID;
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
-      try {
-        String cacheDir = getCacheDir().getCanonicalPath().replaceAll(diskusage, app.pkg);
-        moveIntoPackage(app, media, cacheDir, "Cache", FileSystemPackage.ChildType.CACHE, blockSize);
-      } catch (IOException e) {
+    FileSystemEntry androidDir = childNamed(media, "Android");
+    if (androidDir == null) {
+      for (FileSystemEntry app : apps) {
+        ((FileSystemPackage) app).applyFilter(blockSize);
       }
-    }
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
-      try {
-        String dir = getCodeCacheDir().getCanonicalPath().replaceAll(diskusage, app.pkg);
-        moveIntoPackage(app, media, dir, "CodeCache", FileSystemPackage.ChildType.CACHE, blockSize);
-      } catch (IOException e) {
-      }
-    }
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
-      try {
-        String dir = getExternalCacheDir().getCanonicalPath().replaceAll(diskusage, app.pkg);
-        moveIntoPackage(app, media, dir, "ExternalCache", FileSystemPackage.ChildType.CACHE, blockSize);
-      } catch (IOException e) {
-      }
-    }
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
-      try {
-        String dir = getDataDir().getCanonicalPath().replaceAll(diskusage, app.pkg);
-        moveIntoPackage(app, media, dir, "Data", FileSystemPackage.ChildType.DATA, blockSize);
-      } catch (IOException e) {
-      }
-    }
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
-      try {
-        String dir = getFilesDir().getCanonicalPath().replaceAll(diskusage, app.pkg);
-        moveIntoPackage(app, media, dir, "InternalFiles", FileSystemPackage.ChildType.DATA, blockSize);
-      } catch (IOException e) {
-      }
+      Arrays.sort(apps, FileSystemEntry.COMPARE);
+      return;
     }
 
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
-      try {
-        String dir = getExternalFilesDir(null).getCanonicalPath().replaceAll(diskusage, app.pkg);
-        moveIntoPackage(app, media, dir, "Files", FileSystemPackage.ChildType.DATA, blockSize);
-      } catch (IOException e) {
-      }
-    }
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
-      try {
-        for (File mediaDir : getExternalMediaDirs()) {
-          String dir = mediaDir.getCanonicalPath().replaceAll(diskusage, app.pkg);
-          moveIntoPackage(app, media, dir, "MediaFiles", FileSystemPackage.ChildType.DATA, blockSize);
-        }
-      } catch (IOException e) {
-      }
-    }
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
-      try {
-        for (File mediaDir : getObbDirs()) {
-          String dir = mediaDir.getCanonicalPath().replaceAll(diskusage, app.pkg);
-          moveIntoPackage(app, media, dir, "Obb", FileSystemPackage.ChildType.CODE, blockSize);
-        }
-      } catch (IOException e) {
-      }
-    }
+    Map<String, FileSystemEntry> dataPackages =
+        indexByName(childNamed(androidDir, "data"));
+    Map<String, FileSystemEntry> obbPackages =
+        indexByName(childNamed(androidDir, "obb"));
+    Map<String, FileSystemEntry> mediaPackages =
+        indexByName(childNamed(androidDir, "media"));
 
-    for (FileSystemEntry a : apps) {
-      FileSystemPackage app = (FileSystemPackage)  a;
+    for (FileSystemEntry entry : apps) {
+      FileSystemPackage app = (FileSystemPackage) entry;
+      FileSystemEntry data = dataPackages.get(app.pkg);
+      if (data != null) {
+        moveIntoPackage(app, childNamed(data, "cache"), "ExternalCache",
+            FileSystemPackage.ChildType.CACHE, blockSize);
+        moveIntoPackage(app, childNamed(data, "files"), "Files",
+            FileSystemPackage.ChildType.DATA, blockSize);
+      }
+      moveIntoPackage(app, obbPackages.get(app.pkg), "Obb",
+          FileSystemPackage.ChildType.CODE, blockSize);
+      moveIntoPackage(app, mediaPackages.get(app.pkg), "MediaFiles",
+          FileSystemPackage.ChildType.DATA, blockSize);
       app.applyFilter(blockSize);
     }
     Arrays.sort(apps, FileSystemEntry.COMPARE);

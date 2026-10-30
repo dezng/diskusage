@@ -78,13 +78,19 @@ public class NativeScanner implements ProgressGenerator {
     Log.d(TAG, "scan start: " + mountPoint.getRoot());
 
     Parser parser = new Parser(blockSize);
+    long started = System.nanoTime();
     int result = ScanUtils.scanTree(mountPoint.getRoot(), blockSize, parser);
+    long elapsedNanos = System.nanoTime() - started;
     if (result != 0) {
       throw new RuntimeException("Native scan failed: " + result);
     }
 
     FileSystemEntry root = parser.finish();
-    Log.d(TAG, "scan done: " + root.name + ", entries=" + parser.entryCount);
+    long parseNanos = parser.parseNanos;
+    Log.d(TAG, "scan done: " + root.name + ", entries=" + parser.entryCount
+        + ", total=" + (elapsedNanos / 1_000_000) + "ms"
+        + ", parse=" + (parseNanos / 1_000_000) + "ms"
+        + ", native=" + ((elapsedNanos - parseNanos) / 1_000_000) + "ms");
     return root;
   }
 
@@ -100,6 +106,7 @@ public class NativeScanner implements ProgressGenerator {
     private final ArrayDeque<Frame> stack = new ArrayDeque<>();
     private FileSystemEntry root;
     private int entryCount;
+    long parseNanos;
 
     Parser(int blockSize) {
       this.blockSize = blockSize;
@@ -107,6 +114,12 @@ public class NativeScanner implements ProgressGenerator {
 
     @Override
     public void onData(byte[] data, int length) {
+      long started = System.nanoTime();
+      parseChunk(data, length);
+      parseNanos += System.nanoTime() - started;
+    }
+
+    private void parseChunk(byte[] data, int length) {
       int offset = 0;
       while (offset < length) {
         int type = data[offset++] & 0xff;

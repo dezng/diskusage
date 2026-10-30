@@ -5,7 +5,6 @@ import android.app.usage.StorageStats;
 import android.app.usage.StorageStatsManager;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
@@ -20,6 +19,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Android 8+ implementation. Kept in a separate class so that the legacy path
@@ -46,8 +50,7 @@ final class ModernAppsLoader {
     }
 
     final PackageManager packageManager = diskUsage.getPackageManager();
-    final List<PackageInfo> packages =
-        packageManager.getInstalledPackages(PackageManager.GET_META_DATA);
+    final List<ApplicationInfo> packages = packageManager.getInstalledApplications(0);
     final ArrayList<FileSystemEntry> entries = new ArrayList<>();
 
     final Handler handler = diskUsage.handler;
@@ -70,40 +73,66 @@ final class ModernAppsLoader {
     };
     handler.post(progressUpdater);
 
+    /*
+     * queryStatsForPackage() is a binder call, so doing it serially for every
+     * installed package leaves most of the wall-clock time waiting. Keep the
+     * result order stable and cap the pool to avoid flooding the system
+     * service on low-end devices.
+     */
+    final int threadCount = Math.max(1,
+        Math.min(4, Runtime.getRuntime().availableProcessors()));
+    final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    final List<Future<FileSystemPackage>> futures = new ArrayList<>(packages.size());
     try {
-      for (PackageInfo packageInfo : packages) {
-        final ApplicationInfo metadata = packageInfo.applicationInfo;
-        if (metadata == null) {
-          numLoadedPackages++;
-          continue;
-        }
+      for (final ApplicationInfo metadata : packages) {
+        futures.add(executor.submit(new Callable<FileSystemPackage>() {
+          @Override
+          public FileSystemPackage call() {
+            final String pkg = metadata.packageName;
+            final String appName = metadata.loadLabel(packageManager).toString();
+            try {
+              StorageStats stats = storageStatsManager.queryStatsForPackage(
+                  StorageManager.UUID_DEFAULT, pkg, Process.myUserHandle());
+              FileSystemPackage entry = new FileSystemPackage(
+                  appName,
+                  pkg,
+                  stats.getAppBytes(),
+                  stats.getDataBytes(),
+                  stats.getCacheBytes(),
+                  metadata.flags,
+                  stats.getExternalCacheBytes());
+              entry.applyFilter(blockSize);
+              return entry;
+            } catch (PackageManager.NameNotFoundException | IOException e) {
+              Log.d(TAG, "No stats for " + pkg, e);
+              return null;
+            }
+          }
+        }));
+      }
 
-        final String pkg = packageInfo.packageName;
-        final String appName = metadata.loadLabel(packageManager).toString();
-        lastAppName = appName;
-
+      for (int i = 0; i < futures.size(); i++) {
         try {
-          StorageStats stats = storageStatsManager.queryStatsForPackage(
-              StorageManager.UUID_DEFAULT, pkg, Process.myUserHandle());
-          FileSystemPackage entry = new FileSystemPackage(
-              appName,
-              pkg,
-              stats.getAppBytes(),
-              stats.getDataBytes(),
-              stats.getCacheBytes(),
-              metadata.flags,
-              stats.getExternalCacheBytes());
-          entry.applyFilter(blockSize);
-          entries.add(entry);
-        } catch (PackageManager.NameNotFoundException | IOException e) {
-          Log.d(TAG, "No stats for " + pkg, e);
-        } catch (SecurityException e) {
-          Log.e(TAG, "Usage access is required for app statistics", e);
+          FileSystemPackage entry = futures.get(i).get();
+          if (entry != null) {
+            entries.add(entry);
+            lastAppName = entry.name;
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           break;
+        } catch (ExecutionException e) {
+          if (e.getCause() instanceof SecurityException) {
+            Log.e(TAG, "Usage access is required for app statistics",
+                e.getCause());
+            break;
+          }
+          Log.d(TAG, "No stats for package", e.getCause());
         }
         numLoadedPackages++;
       }
     } finally {
+      executor.shutdownNow();
       handler.removeCallbacks(progressUpdater);
     }
 

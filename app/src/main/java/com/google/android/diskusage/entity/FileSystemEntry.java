@@ -1142,7 +1142,6 @@ public class FileSystemEntry {
    * @param exactMatch TODO
    */
   public FileSystemEntry getEntryByName(String path, boolean exactMatch) {
-    Log.d(TAG, "getEntryForName = " + path);
     String[] pathElements = path.split("/");
     FileSystemEntry entry = this;
 
