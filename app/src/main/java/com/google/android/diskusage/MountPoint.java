@@ -29,21 +29,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 public class MountPoint {
   private static final String TAG = MountPoint.class.getSimpleName();
 
-  private String title;
+  private final String title;
   private final String root;
-  private final boolean forceHasApps;
+  private final boolean internal;
 
   private static boolean init = false;
+  private static List<MountPoint> mountPoints = new ArrayList<>();
+  private static Map<String, MountPoint> mountPointForKey = new HashMap<>();
 
-  MountPoint(String title, String root, boolean forceHasApps) {
+  MountPoint(String title, String root, boolean internal) {
     this.title = title;
     this.root = root;
-    this.forceHasApps = forceHasApps;
+    this.internal = internal;
   }
 
   public String getRoot() {
@@ -54,12 +55,8 @@ public class MountPoint {
     return title;
   }
 
-  public boolean isRootRequired() {
-    return false;
-  }
-
   public boolean isDeleteSupported() {
-    return forceHasApps;
+    return internal;
   }
 
   public String getKey() {
@@ -67,28 +64,16 @@ public class MountPoint {
   }
 
   public boolean hasApps() {
-    return forceHasApps;
-  }
-
-  private static List<MountPoint> mountPoints = new ArrayList<>();
-  private static Map<String,MountPoint> mountPointForKey = new HashMap<>();
-
-  int getChecksum() {
-    return RootMountPoint.checksum;
+    return internal;
   }
 
   public static MountPoint getForKey(Context context, String key) {
     initMountPoints(context);
-    MountPoint mountPoint = mountPointForKey.get(key);
-    if (mountPoint != null) {
-      return mountPoint;
-    }
-    return RootMountPoint.getForKey(context, key);
+    return mountPointForKey.get(key);
   }
 
   public static List<MountPoint> getMountPoints(Context context) {
     initMountPoints(context);
-    RootMountPoint.initMountPoints(context);
     return mountPoints;
   }
 
@@ -96,14 +81,19 @@ public class MountPoint {
     if (init) return;
     init = true;
 
-    for (PortableFile dir : DataSource.get().getExternalFilesDirs(context)) {
-      String path = dir.getAbsolutePath().replaceFirst("/Android/data/" + BuildConfig.APPLICATION_ID + "/files", "");
-      Log.d(TAG, "mountpoint " + path);
+    PortableFile[] dirs = DataSource.get().getExternalFilesDirs(context);
+    for (PortableFile dir : dirs) {
+      if (dir == null) {
+        continue;
+      }
+      String path = dir.getAbsolutePath().replaceFirst(
+          "/Android/data/" + BuildConfig.APPLICATION_ID + "/files", "");
       boolean internal = !dir.isExternalStorageRemovable();
-      String title =  internal ? context.getString(R.string.storage_card) : path;
+      String title = internal ? context.getString(R.string.storage_card) : path;
       MountPoint mountPoint = new MountPoint(title, path, internal);
       mountPoints.add(mountPoint);
       mountPointForKey.put(mountPoint.getKey(), mountPoint);
+      Log.d(TAG, "mountpoint " + path + " internal=" + internal);
     }
   }
 
@@ -111,15 +101,5 @@ public class MountPoint {
     mountPoints = new ArrayList<>();
     mountPointForKey = new HashMap<>();
     init = false;
-    RootMountPoint.reset();
-  }
-
-  @Override
-  public String toString() {
-    return "MountPoint{" +
-            "title='" + title + '\'' +
-            ", root='" + root + '\'' +
-            ", forceHasApps=" + forceHasApps +
-            '}';
   }
 }

@@ -25,14 +25,21 @@ import java.util.Arrays;
 import android.content.pm.ApplicationInfo;
 import android.util.Log;
 
+import com.google.android.diskusage.datasource.AppStats;
+
 public class FileSystemPackage extends FileSystemEntry {
 
   private final String TAG = getClass().getSimpleName();
-    
+
   public final String pkg;
   long codeSize;
   long dataSize;
   long cacheSize;
+  long externalCodeSize;
+  long externalDataSize;
+  long externalCacheSize;
+  long externalMediaSize;
+  long externalObbSize;
   final int flags;
   ArrayList<FileSystemRoot> publicChildren = new ArrayList<>();
 
@@ -44,35 +51,107 @@ public class FileSystemPackage extends FileSystemEntry {
 
   public FileSystemPackage(
       String name, String pkg, long codeSize, long dataSize, long cacheSize, int flags) {
+    this(name, pkg, codeSize, dataSize, cacheSize, 0, 0, 0, 0, 0, flags);
+  }
+
+  public FileSystemPackage(
+      String name, String pkg, long codeSize, long dataSize, long cacheSize,
+      int flags, long externalCacheSize) {
+    this(name, pkg, codeSize, dataSize, cacheSize, 0, 0, externalCacheSize, 0, 0, flags);
+  }
+
+  /**
+   * Creates a package from the legacy PackageStats API. This is used on
+   * Android 7.1 and older, where StorageStatsManager is unavailable.
+   */
+  public FileSystemPackage(String name, String pkg, AppStats stats, int flags) {
+    this(name, pkg,
+        stats.getCodeSize(),
+        stats.getDataSize(),
+        stats.getCacheSize(),
+        stats.getExternalCodeSize(),
+        stats.getExternalDataSize(),
+        stats.getExternalCacheSize(),
+        stats.getExternalMediaSize(),
+        stats.getExternalObbSize(),
+        flags);
+  }
+
+  private FileSystemPackage(
+      String name, String pkg, long codeSize, long dataSize, long cacheSize,
+      long externalCodeSize, long externalDataSize, long externalCacheSize,
+      long externalMediaSize, long externalObbSize, int flags) {
     super(null, name);
     this.pkg = pkg;
     this.cacheSize = cacheSize;
-    this.dataSize = dataSize - cacheSize;
+    this.dataSize = Math.max(0, dataSize - cacheSize);
+    this.externalCacheSize = externalCacheSize;
+    this.externalDataSize = Math.max(0, externalDataSize - externalCacheSize);
+    this.externalCodeSize = externalCodeSize;
+    this.externalMediaSize = externalMediaSize;
+    this.externalObbSize = externalObbSize;
     this.flags = flags;
+
     if ((flags & ApplicationInfo.FLAG_SYSTEM) != 0
         && (flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0) {
       codeSize = 0;
     }
-
-    // TODO: not sure what happens here
-    if ((flags & ApplicationInfo.FLAG_EXTERNAL_STORAGE) != 0) {
+    // Avoid counting the same APK once as internal and once as external.
+    if ((flags & ApplicationInfo.FLAG_EXTERNAL_STORAGE) != 0
+        && externalCodeSize > 0) {
       codeSize = 0;
     }
     this.codeSize = codeSize;
   }
 
+  private long externalTotal() {
+    return externalCodeSize + externalDataSize + externalCacheSize
+        + externalMediaSize + externalObbSize;
+  }
+
   public void applyFilter(int blockSize) {
     clearDrawingCache();
-    long blocks = 0;
-    ArrayList<FileSystemEntry> entries = new ArrayList<FileSystemEntry>();
+    ArrayList<FileSystemEntry> entries = new ArrayList<>();
     entries.addAll(publicChildren);
     entries.add(FileSystemEntry.makeNode(null, "apk")
-            .initSizeInBytes(codeSize, blockSize));
+        .initSizeInBytes(codeSize, blockSize));
     entries.add(FileSystemEntry.makeNode(null, "data")
-            .initSizeInBytes(dataSize, blockSize));
+        .initSizeInBytes(dataSize, blockSize));
     entries.add(FileSystemEntry.makeNode(null, "cache")
-            .initSizeInBytes(cacheSize, blockSize));
+        .initSizeInBytes(cacheSize, blockSize));
 
+    ArrayList<FileSystemEntry> external = new ArrayList<>();
+    if (externalCodeSize > 0) {
+      external.add(FileSystemEntry.makeNode(null, "code")
+          .initSizeInBytes(externalCodeSize, blockSize));
+    }
+    if (externalDataSize > 0) {
+      external.add(FileSystemEntry.makeNode(null, "data")
+          .initSizeInBytes(externalDataSize, blockSize));
+    }
+    if (externalCacheSize > 0) {
+      external.add(FileSystemEntry.makeNode(null, "cache")
+          .initSizeInBytes(externalCacheSize, blockSize));
+    }
+    if (externalMediaSize > 0) {
+      external.add(FileSystemEntry.makeNode(null, "media")
+          .initSizeInBytes(externalMediaSize, blockSize));
+    }
+    if (externalObbSize > 0) {
+      external.add(FileSystemEntry.makeNode(null, "obb")
+          .initSizeInBytes(externalObbSize, blockSize));
+    }
+    if (!external.isEmpty()) {
+      FileSystemEntry externalEntry = FileSystemEntry.makeNode(null, "external");
+      externalEntry.setChildren(
+          external.toArray(new FileSystemEntry[0]), blockSize);
+      entries.add(externalEntry);
+    } else if (externalTotal() > 0) {
+      entries.add(FileSystemEntry.makeNode(null, "external")
+          .initSizeInBytes(externalTotal(), blockSize));
+    }
+
+    long blocks = 0;
     for (FileSystemEntry e : entries) {
       blocks += e.getSizeInBlocks();
     }
@@ -81,32 +160,37 @@ public class FileSystemPackage extends FileSystemEntry {
     for (FileSystemEntry e : entries) {
       e.parent = this;
     }
-    children = entries.toArray(new FileSystemEntry[] {});
+    children = entries.toArray(new FileSystemEntry[0]);
     Arrays.sort(children, FileSystemEntry.COMPARE);
   }
 
   @Override
   public FileSystemEntry create() {
-    return new FileSystemPackage(this.name, this.pkg, this.codeSize, this.dataSize, this.cacheSize,
-                                 this.flags);
+    return new FileSystemPackage(
+        this.name, this.pkg, codeSize, dataSize, cacheSize,
+        externalCodeSize, externalDataSize, externalCacheSize,
+        externalMediaSize, externalObbSize, flags);
   }
 
   public void addPublicChild(FileSystemRoot child, ChildType type, int blockSize) {
     publicChildren.add(child);
     switch (type) {
-      case CODE: codeSize -= child.getSizeInBlocks() * blockSize;
+      case CODE:
+        codeSize -= child.getSizeInBlocks() * blockSize;
         if (codeSize < 0) {
           Log.d(TAG, "code size negative " + codeSize + " for " + pkg);
           codeSize = 0;
         }
         break;
-      case DATA: dataSize -= child.getSizeInBlocks() * blockSize;
+      case DATA:
+        dataSize -= child.getSizeInBlocks() * blockSize;
         if (dataSize < 0) {
           Log.d(TAG, "data size negative " + dataSize + " for " + pkg);
           dataSize = 0;
         }
         break;
-      case CACHE: cacheSize -= child.getSizeInBlocks() * blockSize;
+      case CACHE:
+        cacheSize -= child.getSizeInBlocks() * blockSize;
         if (cacheSize < 0) {
           Log.d(TAG, "cache size negative " + cacheSize + " for " + pkg);
           cacheSize = 0;

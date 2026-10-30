@@ -21,13 +21,10 @@ package com.google.android.diskusage;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -37,12 +34,10 @@ import com.google.android.diskusage.datasource.DebugDataSourceBridge;
 import com.google.android.diskusage.datasource.fast.DefaultDataSource;
 import com.google.android.diskusage.entity.FileSystemEntry;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TreeMap;
 
 public class SelectActivity extends Activity {
@@ -52,7 +47,6 @@ public class SelectActivity extends Activity {
   private AlertDialog dialog;
   Map<String,Bundle> bundles = new TreeMap<String,Bundle>();
   ArrayList<Runnable> actionList = new ArrayList<Runnable>();
-  private boolean expandRootMountPoints;
 //  private static boolean debugUnhidden = true;
   private static boolean debugLoadedDump = false;
   private DataSource debugDataSource;
@@ -108,13 +102,6 @@ public class SelectActivity extends Activity {
       runAction2(mountPoint.getKey(), PermissionRequestActivity.class, !useNativeScanner);
     }
   };
-
-  private class ShowHideAction implements Runnable {
-    public void run() {
-      Intent i = new Intent(SelectActivity.this, ShowHideMountPointsActivity.class);
-      startActivity(i);
-    }
-  }
 
   private class EnableDebugAction implements Runnable {
     public void run() {
@@ -183,35 +170,6 @@ public class SelectActivity extends Activity {
     }
   }
 
-  public Handler handler = new Handler();
-  public Runnable checkForMountsUpdates = new Runnable() {
-    @Override
-    public void run() {
-      boolean reload = false;
-      try {
-        BufferedReader reader = DataSource.get().getProcReader();
-        String line;
-        int checksum = 0;
-        while ((line = reader.readLine()) != null) {
-          checksum += line.length();
-        }
-        reader.close();
-        if (checksum != RootMountPoint.checksum) {
-            Log.d(TAG, checksum + " vs " + RootMountPoint.checksum);
-          reload = true;
-        }
-      } catch (Throwable t) {}
-
-      if (reload) {
-        dialog.hide();
-        MountPoint.reset();
-        makeDialog();
-      }
-      handler.postDelayed(this, 2000);
-    }
-  };
-
-
   public void makeDialog() {
     ArrayList<String> options = new ArrayList<String>();
     actionList.clear();
@@ -222,12 +180,14 @@ public class SelectActivity extends Activity {
       actionList.add(new DiskUsageAction(mountPoint));
     }
 
-    for (MountPoint mountPoint : MountPoint.getMountPoints(this)) {
-      options.add(mountPoint.getTitle() + " force Scanner");
-      actionList.add(new DiskUsageAction(mountPoint, true));
+    if (BuildConfig.DEBUG) {
+      for (MountPoint mountPoint : MountPoint.getMountPoints(this)) {
+        options.add(mountPoint.getTitle() + " force Scanner");
+        actionList.add(new DiskUsageAction(mountPoint, true));
+      }
     }
 
-    if (/*debugUnhidden && */debugDataSourceBridge != null) {
+    if (BuildConfig.DEBUG && debugDataSourceBridge != null) {
       if (debugDataSource != null && !debugLoadedDump) {
         options.add("* Send bug report");
         actionList.add(new SendBugReportAction());
@@ -241,40 +201,9 @@ public class SelectActivity extends Activity {
           options.add("* Load dump");
           actionList.add(new LoadDumpAction());
         }
-      }
-      options.add("* Disable debug");
-      actionList.add(new DisableDebug());
-    }
-
-    if (DataSource.get().isDeviceRooted()) {
-      SharedPreferences prefs =  getSharedPreferences("ignore_list", Context.MODE_PRIVATE);
-      Map<String, ?> ignoreList = prefs.getAll();
-      if (!ignoreList.keySet().isEmpty()) {
-        Set<String> ignores = ignoreList.keySet();
-        for (MountPoint mountPoint : RootMountPoint.getRootedMountPoints(this)) {
-          if (ignores.contains(mountPoint.getRoot())) continue;
-          options.add(mountPoint.getRoot());
-          actionList.add(new DiskUsageAction(mountPoint));
-        }
-        options.add("[Show/hide]");
-        actionList.add(new ShowHideAction());
-      } else if (expandRootMountPoints) {
-        for (MountPoint mountPoint : RootMountPoint.getRootedMountPoints(this)) {
-          options.add(mountPoint.getRoot());
-          actionList.add(new DiskUsageAction(mountPoint));
-        }
-        options.add("[Show/hide]");
-        actionList.add(new ShowHideAction());
       } else {
-        options.add("[Root required]");
-        actionList.add(new Runnable() {
-          @Override
-          public void run() {
-            expandRootMountPoints = true;
-            makeDialog();
-          }
-        });
-
+        options.add("* Disable debug");
+        actionList.add(new DisableDebug());
       }
     }
 
@@ -330,13 +259,11 @@ public class SelectActivity extends Activity {
 //    ActionBar actionBar = getActionBar();
 //    actionBar.setDisplayHomeAsUpEnabled(true);
     makeDialog();
-    handler.post(checkForMountsUpdates);
   }
 
   @Override
   protected void onPause() {
     if (dialog.isShowing()) dialog.dismiss();
-    handler.removeCallbacks(checkForMountsUpdates);
     super.onPause();
   }
 

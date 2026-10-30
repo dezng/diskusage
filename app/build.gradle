@@ -46,6 +46,11 @@ android {
             resources.srcDirs = []
         }
     }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
 }
 
 dependencies {

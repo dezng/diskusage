@@ -695,13 +695,12 @@ public class DiskUsage extends LoadableActivity {
   }
 
   protected FileSystemEntry[] loadApps2SD(int blockSize) {
-    return null;
-//    try {
-//      return (new Apps2SDLoader(this).load(blockSize));
-//    } catch (Throwable t) {
-//      Log.e("diskusage", "problem loading apps2sd info", t);
-//      return null;
-//    }
+    try {
+      return new Apps2SDLoader(this).load(blockSize);
+    } catch (Throwable t) {
+      Log.e(TAG, "problem loading app storage info", t);
+      return null;
+    }
   }
 
   void moveIntoPackage(FileSystemPackage pkg, FileSystemRoot root, String path, String newName, FileSystemPackage.ChildType type, int blockSize) {

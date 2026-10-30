@@ -19,31 +19,37 @@
 
 package com.google.android.diskusage;
 
-import android.app.usage.StorageStats;
-import android.app.usage.StorageStatsManager;
-import android.app.usage.UsageStats;
-import android.app.usage.UsageStatsManager;
-import android.content.Context;
-import android.content.pm.ApplicationInfo;
+import android.content.pm.IPackageStatsObserver;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Handler;
-import android.os.storage.StorageManager;
-import android.system.Os;
-import android.system.StructStat;
-import android.system.StructStatVfs;
 import android.util.Log;
 
+import com.google.android.diskusage.datasource.AppInfo;
+import com.google.android.diskusage.datasource.AppStats;
+import com.google.android.diskusage.datasource.AppStatsCallback;
+import com.google.android.diskusage.datasource.DataSource;
+import com.google.android.diskusage.datasource.PkgInfo;
 import com.google.android.diskusage.entity.FileSystemEntry;
 import com.google.android.diskusage.entity.FileSystemPackage;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * Loads per-application storage statistics.
+ *
+ * <p>Android 8+ delegates to {@link ModernAppsLoader}. Android 7.1 and older
+ * use the legacy PackageManager.getPackageSizeInfo() API, which reports
+ * internal and external (SD card) code/data/cache/media/obb sizes.</p>
+ */
 public class Apps2SDLoader {
-  private final String TAG = getClass().getSimpleName();
+  private static final String TAG = "Apps2SDLoader";
+  private static final long LEGACY_CALLBACK_TIMEOUT_SECONDS = 3;
 
   private final DiskUsage diskUsage;
   private CharSequence lastAppName = "";
@@ -54,24 +60,78 @@ public class Apps2SDLoader {
     this.diskUsage = activity;
   }
 
-
   public FileSystemEntry[] load(final int blockSize) throws Throwable {
-    UsageStatsManager usageStatsManager = (UsageStatsManager) diskUsage.getSystemService(Context.USAGE_STATS_SERVICE);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      return new ModernAppsLoader(diskUsage).load(blockSize);
+    }
+    return loadLegacy(blockSize);
+  }
 
-
-    final List<UsageStats> queryUsageStats=usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_YEARLY, 0 ,System.currentTimeMillis());
-    Log.d(TAG, "stats size = " + queryUsageStats.size());
-    StorageStatsManager storageStatsManager = (StorageStatsManager) diskUsage.getSystemService(Context.STORAGE_STATS_SERVICE);
-    final ArrayList<FileSystemEntry> entries = new ArrayList<FileSystemEntry>();
-    PackageManager packageManager = diskUsage.getApplicationContext().getPackageManager();
-    final Set<String> packages = new HashSet<>();
-    for (UsageStats s : queryUsageStats) {
-      packages.add(s.getPackageName());
+  private FileSystemEntry[] loadLegacy(final int blockSize) throws Throwable {
+    final PackageManager packageManager = diskUsage.getPackageManager();
+    final Method getPackageSizeInfo;
+    try {
+      getPackageSizeInfo = packageManager.getClass().getMethod(
+          "getPackageSizeInfo", String.class, IPackageStatsObserver.class);
+    } catch (NoSuchMethodException e) {
+      Log.e(TAG, "Legacy package size API is unavailable", e);
+      return null;
     }
 
+    final List<PkgInfo> packages = DataSource.get().getInstalledPackages(packageManager);
+    final ArrayList<FileSystemEntry> entries = new ArrayList<>();
+
     final Handler handler = diskUsage.handler;
-    Runnable progressUpdater = new Runnable() {
+    Runnable progressUpdater = makeProgressUpdater(packages.size());
+    handler.post(progressUpdater);
+
+    try {
+      for (PkgInfo info : packages) {
+        final AppInfo appInfo = info.getApplicationInfo();
+        if (appInfo == null) {
+          numLoadedPackages++;
+          continue;
+        }
+
+        final String pkg = info.getPackageName();
+        final String appName = appInfo.getApplicationLabel();
+        final int flags = appInfo.getFlags();
+        lastAppName = appName;
+        final CountDownLatch done = new CountDownLatch(1);
+        final FileSystemPackage[] result = new FileSystemPackage[1];
+
+        try {
+          DataSource.get().getPackageSizeInfo(
+              info, getPackageSizeInfo, packageManager, new AppStatsCallback() {
+                @Override
+                public void onGetStatsCompleted(AppStats stats, boolean succeeded) {
+                  if (succeeded && stats != null) {
+                    result[0] = new FileSystemPackage(appName, pkg, stats, flags);
+                  }
+                  done.countDown();
+                }
+              });
+          done.await(LEGACY_CALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception e) {
+          Log.d(TAG, "Legacy stats failed for " + pkg, e);
+        }
+
+        if (result[0] != null) {
+          result[0].applyFilter(blockSize);
+          entries.add(result[0]);
+        }
+        numLoadedPackages++;
+      }
+    } finally {
+      handler.removeCallbacks(progressUpdater);
+    }
+
+    return finish(entries);
+  }
+
+  private Runnable makeProgressUpdater(final int max) {
+    final Handler handler = diskUsage.handler;
+    return new Runnable() {
       @Override
       public void run() {
         MyProgressDialog dialog = diskUsage.getPersistantState().loading;
@@ -80,46 +140,22 @@ public class Apps2SDLoader {
             dialog.switchToSecondary();
             switchToSecondary = false;
           }
-          dialog.setMax(packages.size());
-          final CharSequence appName;
+          dialog.setMax(max);
           synchronized (Apps2SDLoader.this) {
-            appName = lastAppName;
+            dialog.setProgress(numLoadedPackages, lastAppName);
           }
-          dialog.setProgress(numLoadedPackages, appName);
         }
-        diskUsage.handler.postDelayed(this, 50);
+        handler.postDelayed(this, 50);
       }
     };
-    handler.post(progressUpdater);
+  }
 
-
-    for (String pkg : packages) {
-      Log.d(TAG, "app: " + pkg);
-      try {
-        ApplicationInfo metadata = packageManager.getApplicationInfo(pkg, PackageManager.GET_META_DATA);
-        String appName = metadata.loadLabel(packageManager).toString();
-        lastAppName = appName;
-        StorageStats stats = storageStatsManager.queryStatsForPackage(
-                StorageManager.UUID_DEFAULT, pkg, android.os.Process.myUserHandle());
-        Log.d(TAG, "stats: " + stats.getAppBytes() + " " + stats.getDataBytes());
-        FileSystemPackage p = new FileSystemPackage(
-                appName,
-                pkg,
-                stats.getAppBytes(),
-                stats.getDataBytes(),
-                stats.getCacheBytes(),
-                metadata.flags);
-        p.applyFilter(blockSize);
-        entries.add(p);
-        numLoadedPackages++;
-      } catch (PackageManager.NameNotFoundException e) {
-        Log.d(TAG, "Failed to get package", e);
-      }
+  private FileSystemEntry[] finish(ArrayList<FileSystemEntry> entries) {
+    if (entries.isEmpty()) {
+      return null;
     }
-
-    FileSystemEntry[] result = entries.toArray(new FileSystemEntry[] {});
+    FileSystemEntry[] result = entries.toArray(new FileSystemEntry[0]);
     Arrays.sort(result, FileSystemEntry.COMPARE);
-    handler.removeCallbacks(progressUpdater);
     return result;
   }
 }
