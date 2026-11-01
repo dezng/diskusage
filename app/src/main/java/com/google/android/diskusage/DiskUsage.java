@@ -62,6 +62,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 public class DiskUsage extends LoadableActivity {
 
@@ -587,6 +591,57 @@ public class DiskUsage extends LoadableActivity {
     long pos();
   };
 
+  /**
+   * Runs the app statistics scan on its own thread so it can overlap with the
+   * filesystem tree scan. Progress reporting is deferred until the filesystem
+   * scan finishes, otherwise both scans would drive the same dialog.
+   */
+  private final class AppScanTask {
+    private final Apps2SDLoader loader;
+    private final FutureTask<FileSystemEntry[]> task;
+    private final Thread thread;
+
+    AppScanTask(final int blockSize) {
+      loader = new Apps2SDLoader(DiskUsage.this, false);
+      task = new FutureTask<FileSystemEntry[]>(new Callable<FileSystemEntry[]>() {
+        @Override
+        public FileSystemEntry[] call() {
+          try {
+            return loader.load(blockSize);
+          } catch (Throwable t) {
+            throw new RuntimeException(t);
+          }
+        }
+      });
+      thread = new Thread(task, "app-stats-scan");
+    }
+
+    void start() {
+      thread.start();
+    }
+
+    void enableProgress() {
+      loader.enableProgress();
+    }
+
+    FileSystemEntry[] get() throws InterruptedException {
+      try {
+        return task.get();
+      } catch (ExecutionException e) {
+        Log.e(TAG, "problem loading app storage info", e.getCause());
+        return null;
+      } catch (CancellationException e) {
+        return null;
+      }
+    }
+
+    void cancelIfRunning() {
+      if (!task.isDone()) {
+        task.cancel(true);
+      }
+    }
+  }
+
   Runnable makeProgressUpdater(final ProgressGenerator scanner,
       final FileSystemStats stats) {
     return new Runnable() {
@@ -615,63 +670,84 @@ public class DiskUsage extends LoadableActivity {
     final FileSystemStats stats = new FileSystemStats(mountPoint);
     int heap = getMemoryQuota();
 
-    FileSystemEntry rootElement;
-    if (useNativeScanner) {
-      try {
-        rootElement = nativeFirstScanner(stats, mountPoint);
-      } catch (RuntimeException e) {
-        Log.e("NativeScanner", "scan: err.", e);
+    final AppScanTask appScan;
+    if (mountPoint.hasApps()) {
+      appScan = new AppScanTask(stats.blockSize);
+      appScan.start();
+    } else {
+      appScan = null;
+    }
+
+    try {
+      FileSystemEntry rootElement;
+      if (useNativeScanner) {
+        try {
+          rootElement = nativeFirstScanner(stats, mountPoint);
+        } catch (RuntimeException e) {
+          Log.e("NativeScanner", "scan: err.", e);
+          rootElement = normalScanner(stats, heap, mountPoint);
+        }
+      } else {
         rootElement = normalScanner(stats, heap, mountPoint);
       }
-    } else {
-      rootElement = normalScanner(stats, heap, mountPoint);
-    }
 
-    ArrayList<FileSystemEntry> entries = new ArrayList<FileSystemEntry>();
+      // The filesystem progress updater has stopped at this point. From here on
+      // the app scan may drive the dialog.
+      if (appScan != null) {
+        appScan.enableProgress();
+      }
 
-    if (rootElement.children != null) {
-      for (FileSystemEntry e : rootElement.children) {
-        entries.add(e);
+      ArrayList<FileSystemEntry> entries = new ArrayList<FileSystemEntry>();
+
+      if (rootElement.children != null) {
+        for (FileSystemEntry e : rootElement.children) {
+          entries.add(e);
+        }
+      }
+
+      if (mountPoint.hasApps()) {
+        FileSystemRoot media = (FileSystemRoot) FileSystemRoot.makeNode(
+            "media", realMountPoint.getRoot(), false).setChildren(entries.toArray(new FileSystemEntry[0]),
+                stats.blockSize);
+        entries = new ArrayList<FileSystemEntry>();
+        entries.add(media);
+
+        FileSystemEntry[] appList = appScan == null
+            ? loadApps2SD(stats.blockSize) : appScan.get();
+        if (appList != null) {
+          moveAppData(appList, media, stats.blockSize);
+          FileSystemEntry apps = FileSystemEntry.makeNode(null, "Apps").setChildren(appList, stats.blockSize);
+          entries.add(apps);
+        }
+      }
+
+      long visibleBlocks = 0;
+      for (FileSystemEntry e : entries) {
+        visibleBlocks += e.getSizeInBlocks();
+      }
+
+      long systemBlocks = stats.totalBlocks - stats.freeBlocks - visibleBlocks;
+      Collections.sort(entries, FileSystemEntry.COMPARE);
+      if (systemBlocks > 0) {
+        entries.add(new FileSystemSystemSpace(getString(R.string.graph_system_data), systemBlocks * stats.blockSize, stats.blockSize));
+        entries.add(new FileSystemFreeSpace(getString(R.string.graph_free_space), stats.freeBlocks * stats.blockSize, stats.blockSize));
+      } else {
+        long freeBlocks = stats.freeBlocks + systemBlocks;
+        if (freeBlocks > 0) {
+          entries.add(new FileSystemFreeSpace(getString(R.string.graph_free_space), freeBlocks * stats.blockSize, stats.blockSize));
+        }
+      }
+
+      rootElement = FileSystemRoot.makeNode(mountPoint.getTitle(), mountPoint.getRoot(), false)
+          .setChildren(entries.toArray(new FileSystemEntry[0]), stats.blockSize);
+      FileSystemSuperRoot newRoot = new FileSystemSuperRoot(stats.blockSize);
+      newRoot.setChildren(new FileSystemEntry[] { rootElement }, stats.blockSize);
+      return newRoot;
+    } finally {
+      if (appScan != null) {
+        appScan.cancelIfRunning();
       }
     }
-
-    if (mountPoint.hasApps()) {
-      FileSystemRoot media = (FileSystemRoot) FileSystemRoot.makeNode(
-          "media", realMountPoint.getRoot(), false).setChildren(entries.toArray(new FileSystemEntry[0]),
-              stats.blockSize);
-      entries = new ArrayList<FileSystemEntry>();
-      entries.add(media);
-
-      FileSystemEntry[] appList = loadApps2SD(stats.blockSize);
-      if (appList != null) {
-        moveAppData(appList, media, stats.blockSize);
-        FileSystemEntry apps = FileSystemEntry.makeNode(null, "Apps").setChildren(appList, stats.blockSize);
-        entries.add(apps);
-      }
-    }
-
-    long visibleBlocks = 0;
-    for (FileSystemEntry e : entries) {
-      visibleBlocks += e.getSizeInBlocks();
-    }
-
-    long systemBlocks = stats.totalBlocks - stats.freeBlocks - visibleBlocks;
-    Collections.sort(entries, FileSystemEntry.COMPARE);
-    if (systemBlocks > 0) {
-      entries.add(new FileSystemSystemSpace(getString(R.string.graph_system_data), systemBlocks * stats.blockSize, stats.blockSize));
-      entries.add(new FileSystemFreeSpace(getString(R.string.graph_free_space), stats.freeBlocks * stats.blockSize, stats.blockSize));
-    } else {
-      long freeBlocks = stats.freeBlocks + systemBlocks;
-      if (freeBlocks > 0) {
-        entries.add(new FileSystemFreeSpace(getString(R.string.graph_free_space), freeBlocks * stats.blockSize, stats.blockSize));
-      }
-    }
-
-    rootElement = FileSystemRoot.makeNode(mountPoint.getTitle(), mountPoint.getRoot(), false)
-        .setChildren(entries.toArray(new FileSystemEntry[0]), stats.blockSize);
-    FileSystemSuperRoot newRoot = new FileSystemSuperRoot(stats.blockSize);
-    newRoot.setChildren(new FileSystemEntry[] { rootElement }, stats.blockSize);
-    return newRoot;
   }
 
   private FileSystemEntry normalScanner(FileSystemStats stats, int heap, MountPoint mountPoint) throws IOException {
@@ -679,9 +755,12 @@ public class DiskUsage extends LoadableActivity {
     final Scanner scanner = new Scanner(20, stats.blockSize, stats.busyBlocks, heap);
     progressUpdater = makeProgressUpdater(scanner, stats);
     handler.post(progressUpdater);
-    rootElement = scanner.scan(DataSource.get().createLegacyScanFile(mountPoint.getRoot()));
+    try {
+      rootElement = scanner.scan(DataSource.get().createLegacyScanFile(mountPoint.getRoot()));
+    } finally {
+      handler.removeCallbacks(progressUpdater);
+    }
     Log.d(TAG, "normalScanner: " + rootElement);
-    handler.removeCallbacks(progressUpdater);
     return rootElement;
   }
 
@@ -690,8 +769,11 @@ public class DiskUsage extends LoadableActivity {
     final NativeScanner scanner = new NativeScanner(stats.blockSize);
     progressUpdater = makeProgressUpdater(scanner, stats);
     handler.post(progressUpdater);
-    rootElement = scanner.scan(mountPoint);
-    handler.removeCallbacks(progressUpdater);
+    try {
+      rootElement = scanner.scan(mountPoint);
+    } finally {
+      handler.removeCallbacks(progressUpdater);
+    }
     return rootElement;
   }
 

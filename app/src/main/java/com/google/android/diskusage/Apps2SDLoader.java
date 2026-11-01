@@ -55,14 +55,33 @@ public class Apps2SDLoader {
   private CharSequence lastAppName = "";
   private boolean switchToSecondary = true;
   private int numLoadedPackages = 0;
+  private volatile boolean progressEnabled;
 
   public Apps2SDLoader(DiskUsage activity) {
+    this(activity, true);
+  }
+
+  /**
+   * @param progressEnabled when false the dialog is left untouched until
+   *     {@link #enableProgress()} is called. Used when the app scan runs in
+   *     parallel with the filesystem scan and must not overwrite its progress.
+   */
+  Apps2SDLoader(DiskUsage activity, boolean progressEnabled) {
     this.diskUsage = activity;
+    this.progressEnabled = progressEnabled;
+  }
+
+  void enableProgress() {
+    progressEnabled = true;
+  }
+
+  boolean isProgressEnabled() {
+    return progressEnabled;
   }
 
   public FileSystemEntry[] load(final int blockSize) throws Throwable {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      return new ModernAppsLoader(diskUsage).load(blockSize);
+      return new ModernAppsLoader(diskUsage, this).load(blockSize);
     }
     return loadLegacy(blockSize);
   }
@@ -134,6 +153,10 @@ public class Apps2SDLoader {
     return new Runnable() {
       @Override
       public void run() {
+        if (!progressEnabled) {
+          handler.postDelayed(this, 50);
+          return;
+        }
         MyProgressDialog dialog = diskUsage.getPersistantState().loading;
         if (dialog != null) {
           if (switchToSecondary) {

@@ -34,12 +34,14 @@ final class ModernAppsLoader {
   private static final String TAG = "ModernAppsLoader";
 
   private final DiskUsage diskUsage;
+  private final Apps2SDLoader owner;
   private CharSequence lastAppName = "";
   private boolean switchToSecondary = true;
   private int numLoadedPackages = 0;
 
-  ModernAppsLoader(DiskUsage diskUsage) {
+  ModernAppsLoader(DiskUsage diskUsage, Apps2SDLoader owner) {
     this.diskUsage = diskUsage;
+    this.owner = owner;
   }
 
   FileSystemEntry[] load(final int blockSize) throws Throwable {
@@ -57,6 +59,10 @@ final class ModernAppsLoader {
     Runnable progressUpdater = new Runnable() {
       @Override
       public void run() {
+        if (!owner.isProgressEnabled()) {
+          handler.postDelayed(this, 50);
+          return;
+        }
         MyProgressDialog dialog = diskUsage.getPersistantState().loading;
         if (dialog != null) {
           if (switchToSecondary) {
