@@ -8,7 +8,7 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import com.google.android.diskusage.FileSystemState.FileSystemView;
-import com.google.android.diskusage.entity.FileSystemEntry;
+import com.google.android.diskusage.render.EntryRenderStyle;
 
 public final class FileSystemViewCPU extends View implements FileSystemView {
 
@@ -20,6 +20,7 @@ public final class FileSystemViewCPU extends View implements FileSystemView {
       FileSystemState eventHandler) {
     super(context);
     this.eventHandler = eventHandler;
+    EntryRenderStyle.loadDrawables(context);
     setFocusable(true);
     setFocusableInTouchMode(true);
     setBackgroundColor(Color.GRAY);
@@ -59,7 +60,7 @@ public final class FileSystemViewCPU extends View implements FileSystemView {
   @Override
   protected final void onLayout(boolean changed, int left, int top, int right, int bottom) {
     super.onLayout(changed, left, top, right, bottom);
-    FileSystemEntry.updateFontsLegacy(getContext());
+    EntryRenderStyle.updateFontsLegacy(getContext());
     eventHandler.layout(changed, left, top, right, bottom, getWidth(), getHeight());
   }
   

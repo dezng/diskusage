@@ -26,6 +26,8 @@ import com.google.android.diskusage.entity.FileSystemSuperRoot;
 import com.google.android.diskusage.entity.FileSystemSystemSpace;
 import com.google.android.diskusage.opengl.FileSystemViewGPU;
 import com.google.android.diskusage.opengl.RenderingThread;
+import com.google.android.diskusage.render.EntryRenderer;
+import com.google.android.diskusage.render.EntryRenderStyle;
 
 import android.graphics.Canvas;
 import android.graphics.Rect;
@@ -312,10 +314,10 @@ public class FileSystemState {
 
           float avg_x = 0.5f * (xmax + xmin);
           float dx = xmax - xmin;
-          minDistanceX = FileSystemEntry.elementWidth / 2;
+          minDistanceX = EntryRenderStyle.elementWidth / 2;
           if (dx < minDistanceX) dx = minDistanceX;
-          touchWidth = dx / FileSystemEntry.elementWidth;
-          touchPointX = viewDepth + avg_x / FileSystemEntry.elementWidth;
+          touchWidth = dx / EntryRenderStyle.elementWidth;
+          touchPointX = viewDepth + avg_x / EntryRenderStyle.elementWidth;
           //            Log.d(TAG, "multitouch reset " + avg_x + " : " + dx);
           return true;
         }
@@ -329,16 +331,16 @@ public class FileSystemState {
         float avg_x = 0.5f * (xmax + xmin);
         float dx = xmax - xmin;
         if (dx < minDistanceX) dx = minDistanceX;
-        FileSystemEntry.elementWidth = (int) (dx / touchWidth);
+        EntryRenderStyle.elementWidth = (int) (dx / touchWidth);
 
-        if (FileSystemEntry.elementWidth < minElementWidth)
-          FileSystemEntry.elementWidth = minElementWidth;
-//        else if (FileSystemEntry.elementWidth > maxElementWidth)
-//          FileSystemEntry.elementWidth = maxElementWidth;
-        targetElementWidth = FileSystemEntry.elementWidth;
+        if (EntryRenderStyle.elementWidth < minElementWidth)
+          EntryRenderStyle.elementWidth = minElementWidth;
+//        else if (EntryRenderStyle.elementWidth > maxElementWidth)
+//          EntryRenderStyle.elementWidth = maxElementWidth;
+        targetElementWidth = EntryRenderStyle.elementWidth;
 
-        targetViewDepth = viewDepth = touchPointX - avg_x / FileSystemEntry.elementWidth;
-        maxLevels = screenWidth / (float) FileSystemEntry.elementWidth;
+        targetViewDepth = viewDepth = touchPointX - avg_x / EntryRenderStyle.elementWidth;
+        maxLevels = screenWidth / (float) EntryRenderStyle.elementWidth;
         //          Log.d(TAG, "multitouch " + avg_x + " : " + dx + "(" + old_dx + ")");
 
         long dt = (displayBottom - displayTop) / 41;
@@ -377,9 +379,9 @@ public class FileSystemState {
       return;
     touchMovement = true;
 
-    viewDepth -= touchOffsetX / FileSystemEntry.elementWidth;
-    if (viewDepth * FileSystemEntry.elementWidth < -screenWidth * 0.6)
-      viewDepth = -screenWidth * 0.6f / FileSystemEntry.elementWidth;
+    viewDepth -= touchOffsetX / EntryRenderStyle.elementWidth;
+    if (viewDepth * EntryRenderStyle.elementWidth < -screenWidth * 0.6)
+      viewDepth = -screenWidth * 0.6f / EntryRenderStyle.elementWidth;
     targetViewDepth = viewDepth;
 
     long offset = (long)(touchOffsetY / yscale);
@@ -511,8 +513,8 @@ public class FileSystemState {
       newTouchY = filterY.noFilter(newTouchY);
       touchX = newTouchX;
       touchY = newTouchY;
-      touchDepth = (FileSystemEntry.elementWidth * viewDepth + touchX) /
-      FileSystemEntry.elementWidth;
+      touchDepth = (EntryRenderStyle.elementWidth * viewDepth + touchX) /
+      EntryRenderStyle.elementWidth;
       touchPoint = displayTop + (displayBottom - displayTop) * (long)touchY / screenHeight;
       touchEntry = masterRoot.findEntry((int)touchDepth + 1, touchPoint);
       if (touchEntry == masterRoot) {
@@ -549,9 +551,9 @@ public class FileSystemState {
       { // copy paste, fling
         float touchOffsetX = speedX * 15;
         float touchOffsetY = speedY * 15;
-        targetViewDepth -= touchOffsetX / FileSystemEntry.elementWidth;
-        if (targetViewDepth * FileSystemEntry.elementWidth < -screenWidth * 0.6)
-          targetViewDepth = -screenWidth * 0.6f / FileSystemEntry.elementWidth;
+        targetViewDepth -= touchOffsetX / EntryRenderStyle.elementWidth;
+        if (targetViewDepth * EntryRenderStyle.elementWidth < -screenWidth * 0.6)
+          targetViewDepth = -screenWidth * 0.6f / EntryRenderStyle.elementWidth;
 
 
         long offset = (long)(touchOffsetY / yscale);
@@ -716,14 +718,14 @@ public class FileSystemState {
       viewTop = targetViewTop;
       viewBottom = targetViewBottom;
       viewDepth = targetViewDepth;
-      FileSystemEntry.elementWidth = targetElementWidth;
+      EntryRenderStyle.elementWidth = targetElementWidth;
       maxLevels = screenWidth / (float) targetElementWidth;
     } else {
       double f = interpolator.getInterpolation((curr - animationStartTime) / (float) animationDuration);
       viewTop = (long)(f * targetViewTop + (1-f) * prevViewTop);
       viewBottom = (long)(f * targetViewBottom + (1-f) * prevViewBottom);
       viewDepth = (float)(f * targetViewDepth + (1-f) * prevViewDepth);
-      FileSystemEntry.elementWidth = (int)(f * targetElementWidth + (1-f) * prevElementWidth);
+      EntryRenderStyle.elementWidth = (int)(f * targetElementWidth + (1-f) * prevElementWidth);
 
       animation = true;
     }
@@ -743,7 +745,7 @@ public class FileSystemState {
       return true;
     } else if (!screenTouching) {
       if (targetViewTop < 0 || targetViewBottom > masterRoot.getSizeForRendering()
-          || viewDepth < 0 || FileSystemEntry.elementWidth > maxElementWidth) {
+          || viewDepth < 0 || EntryRenderStyle.elementWidth > maxElementWidth) {
         prepareMotion(SystemClock.uptimeMillis());
         animationDuration = 300;
 //        view.requestRepaint();
@@ -779,7 +781,8 @@ public class FileSystemState {
   private final void paintSlowGPU(final RenderingThread rt,
       long viewTop, long viewBottom, float viewDepth, int screenWidth, int screenHeight) {
     Rect bounds2 = new Rect(0, 0, screenWidth, screenHeight);
-    masterRoot.paintGPU(rt, bounds2, cursor, viewTop, viewDepth, yscale, screenHeight, numSpecialEntries);
+    EntryRenderer.forGpu(rt).draw(masterRoot, bounds2, cursor, viewTop,
+        viewDepth, yscale, screenHeight, numSpecialEntries, deletingEntry);
   }
 
   public boolean onDrawGPU(RenderingThread rt) {
@@ -798,12 +801,12 @@ public class FileSystemState {
 
   private final void paintSlow(final Canvas canvas,
       long viewTop, long viewBottom, float viewDepth, Rect bounds, int screenHeight) {
-    if (bounds.bottom != 0 || bounds.top != 0 || bounds.left != 0 || bounds.right != 0) {
-      masterRoot.paint(canvas, bounds, cursor, viewTop, viewDepth, yscale, screenHeight, numSpecialEntries);
-    } else {
-      Rect bounds2 = new Rect(0, 0, screenWidth, screenHeight);
-      masterRoot.paint(canvas, bounds2, cursor, viewTop, viewDepth, yscale, screenHeight, numSpecialEntries);
+    Rect drawBounds = bounds;
+    if (bounds.bottom == 0 && bounds.top == 0 && bounds.left == 0 && bounds.right == 0) {
+      drawBounds = new Rect(0, 0, screenWidth, screenHeight);
     }
+    EntryRenderer.forCanvas(canvas).draw(masterRoot, drawBounds, cursor, viewTop,
+        viewDepth, yscale, screenHeight, numSpecialEntries, deletingEntry);
   }
 
   public final void onDraw2(final Canvas canvas) {
@@ -826,14 +829,14 @@ public class FileSystemState {
     prevViewDepth = viewDepth;
     prevViewTop = viewTop;
     prevViewBottom = viewBottom;
-    prevElementWidth = FileSystemEntry.elementWidth;
+    prevElementWidth = EntryRenderStyle.elementWidth;
     animationStartTime = time;
   }
 
   final void invalidate(Cursor cursor) {
-    float cursorx0 = (cursor.depth - viewDepth) * FileSystemEntry.elementWidth;
+    float cursorx0 = (cursor.depth - viewDepth) * EntryRenderStyle.elementWidth;
     float cursory0 = (cursor.top - displayTop) * yscale;
-    float cursorx1 = cursorx0 + FileSystemEntry.elementWidth;
+    float cursorx1 = cursorx0 + EntryRenderStyle.elementWidth;
     float cursory1 = cursory0 + cursor.position.getSizeForRendering() * yscale;
     requestRepaint((int)cursorx0, (int)cursory0, (int)cursorx1 + 2, (int)cursory1 + 2);
   }
@@ -887,7 +890,7 @@ public class FileSystemState {
 //      Log.d(TAG, "zoom false");
       fullZoom = false;
     } else {
-      if (entry.getSizeForRendering() * yscale > FileSystemEntry.fontSize * 2) {
+      if (entry.getSizeForRendering() * yscale > EntryRenderStyle.fontSize * 2) {
         fullZoom = true;
       } else {
         fullZoom = false;
@@ -938,11 +941,11 @@ public class FileSystemState {
 
     float yscale = screenHeight / (float)(targetViewBottom - targetViewTop);
 
-    if (cursor.position.getSizeForRendering() * yscale > FileSystemEntry.fontSize * 2 + 2) {
+    if (cursor.position.getSizeForRendering() * yscale > EntryRenderStyle.fontSize * 2 + 2) {
       //Log.d(TAG, "position large enough to contain label");
     } else {
       //Log.d(TAG, "zoom in");
-      float new_yscale = FileSystemEntry.fontSize * 2.5f / cursor.position.getSizeForRendering();
+      float new_yscale = EntryRenderStyle.fontSize * 2.5f / cursor.position.getSizeForRendering();
       prepareMotion(eventTime);
 
       targetViewTop = targetViewBottom - (long) (screenHeight / new_yscale);
@@ -1087,7 +1090,6 @@ public class FileSystemState {
       freeSpace.clearDrawingCache();
     }
 
-    FileSystemEntry.deletedEntry = null;
     FileSystemEntry parent = deletingEntry.parent;
 
     long freeSpaceEncoded = 0, systemSpaceEncoded = 0;
@@ -1126,7 +1128,6 @@ public class FileSystemState {
     }
     deletingAnimationStartTime = 0;
     deletingEntry = entry;
-    FileSystemEntry.deletedEntry = entry;
     deletingInitialSize = entry.getSizeInBlocks();
   }
 
@@ -1331,7 +1332,7 @@ public class FileSystemState {
 
     minDistance = screenHeight > screenWidth ? screenHeight /  10 : screenWidth / 10;
     Log.d(TAG, "screen = " + screenWidth + "x" + screenHeight);
-    FileSystemEntry.elementWidth = targetElementWidth = (int) (screenWidth / maxLevels);
+    EntryRenderStyle.elementWidth = targetElementWidth = (int) (screenWidth / maxLevels);
     setZoomState();
   }
 
@@ -1387,7 +1388,7 @@ public class FileSystemState {
 
     freeSpaceZoom = masterRoot.getSizeForRendering();
     long busy = masterRoot.getSizeForRendering() - freeSpace.getSizeForRendering();
-    float message = FileSystemEntry.fontSize * 2 + 1f;
+    float message = EntryRenderStyle.fontSize * 2 + 1f;
     float height = screenHeight / 41f * 40f;
     long required = (long)(busy * (height / (height - message)));
     required *= 40f / 40.5f;

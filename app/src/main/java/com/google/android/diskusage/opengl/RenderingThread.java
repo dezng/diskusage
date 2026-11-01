@@ -23,7 +23,7 @@ import android.util.Log;
 
 import com.google.android.diskusage.FileSystemState;
 import com.google.android.diskusage.R;
-import com.google.android.diskusage.entity.FileSystemEntry;
+import com.google.android.diskusage.render.EntryRenderStyle;
 
 
 public class RenderingThread extends AbstractRenderingThread {
@@ -78,7 +78,7 @@ public class RenderingThread extends AbstractRenderingThread {
   private static final Paint textPaint = new Paint();
   private int textHeight;
   private float textBaseline;
-  private static final int padding = FileSystemEntry.padding;
+  private static final int padding = EntryRenderStyle.padding;
   ArrayList<BitmapMap> bitmaps = new ArrayList<BitmapMap>();
   
   private static final float divTexSize = 1.f / TEXTURE_SIZE;
@@ -132,10 +132,10 @@ public class RenderingThread extends AbstractRenderingThread {
     }
     
     textPaint.setTextSize(textSize);
-    textBaseline = - textPaint.ascent() + FileSystemEntry.padding;
-    textHeight = (int)(textPaint.descent() - textPaint.ascent() + 1 + 2 * FileSystemEntry.padding);
+    textBaseline = - textPaint.ascent() + EntryRenderStyle.padding;
+    textHeight = (int)(textPaint.descent() - textPaint.ascent() + 1 + 2 * EntryRenderStyle.padding);
     max_usage = (int)((TEXTURE_SIZE - 1) / textHeight) * (TEXTURE_SIZE - 2);
-    FileSystemEntry.updateFonts(textSize);
+    EntryRenderStyle.updateFonts(textSize);
   }
   
   public RenderingThread(
@@ -539,7 +539,7 @@ public class RenderingThread extends AbstractRenderingThread {
       int textHeight = rt.textHeight;
       float textBaseline = rt.textBaseline;
       if (size == 0) {
-        size = (int)(textPaint.measureText(message) + 1 + 2 * FileSystemEntry.padding);
+        size = (int)(textPaint.measureText(message) + 1 + 2 * EntryRenderStyle.padding);
       }
       if (bitmapMap == null) {
         bitmapMap = rt.getCurrentBitmapMap();
