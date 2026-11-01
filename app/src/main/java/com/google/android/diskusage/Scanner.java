@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.PriorityQueue;
 
 import android.os.StatFs;
-import android.system.ErrnoException;
 import android.system.Os;
 import android.system.StructStat;
 import android.util.Log;
@@ -105,7 +104,7 @@ public class Scanner implements DiskUsage.ProgressGenerator {
       StructStat stat = Os.stat(file.getCannonicalPath());
       dev = stat.st_dev;
       st_blocks = stat.st_blocks;
-    } catch (ErrnoException e) {
+    } catch (Exception e) {
       throw new IOException("Failed to find root folder", e);
     }
     scanDirectory(null, file, 0, st_blocks / blockSizeIn512Bytes);
@@ -194,7 +193,7 @@ public class Scanner implements DiskUsage.ProgressGenerator {
 //        if ((res.st_mode & 0x0100000) == 0 && (res.st_mode & 0x0040000) == 0) continue;
         st_blocks = res.st_blocks;
         st_size = res.st_size;
-      } catch (ErrnoException|IOException e) {
+      } catch (Exception e) {
         continue;
       }
 
@@ -321,7 +320,7 @@ public class Scanner implements DiskUsage.ProgressGenerator {
       try {
         StructStat res = Os.stat(file.getCannonicalPath());
         return res.st_blocks;
-      } catch (ErrnoException|IOException e) {
+      } catch (Exception e) {
         return 0;
       }
     }

@@ -32,7 +32,6 @@ import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.FileUriExposedException;
 import android.os.Handler;
 import android.provider.Settings;
 import android.util.Log;
@@ -352,7 +351,7 @@ public class DiskUsage extends LoadableActivity {
       try {
         startActivity(intent);
         return;
-      } catch(ActivityNotFoundException|FileUriExposedException e) {
+      } catch(RuntimeException e) {
       }
 
       intent = new Intent("org.openintents.action.PICK_DIRECTORY");
@@ -366,7 +365,7 @@ public class DiskUsage extends LoadableActivity {
       try {
         startActivity(intent);
         return;
-      } catch(ActivityNotFoundException|FileUriExposedException e) {
+      } catch(RuntimeException e) {
       }
 
       // old Astro
@@ -378,7 +377,7 @@ public class DiskUsage extends LoadableActivity {
       try {
         startActivity(intent);
         return;
-      } catch(ActivityNotFoundException|FileUriExposedException e) {
+      } catch(RuntimeException e) {
       }
 
       final Intent installSolidExplorer = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=pl.solidexplorer"));
@@ -435,7 +434,7 @@ public class DiskUsage extends LoadableActivity {
         intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivity(intent);
         return;
-      } catch (ActivityNotFoundException|FileUriExposedException ignored) {
+      } catch (RuntimeException ignored) {
         Log.e("diskusage", "Can't open viewer and crash", ignored);
       }
     }
