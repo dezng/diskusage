@@ -626,15 +626,9 @@ public class FileProvider extends ContentProvider {
                 } else if (TAG_EXTERNAL.equals(tag)) {
                     target = Environment.getExternalStorageDirectory();
                 } else if (TAG_EXTERNAL_FILES.equals(tag)) {
-                    File[] externalFilesDirs = ContextCompat.getExternalFilesDirs(context, null);
-                    if (externalFilesDirs.length > 0) {
-                        target = externalFilesDirs[0];
-                    }
+                    target = context.getExternalFilesDir(null);
                 } else if (TAG_EXTERNAL_CACHE.equals(tag)) {
-                    File[] externalCacheDirs = ContextCompat.getExternalCacheDirs(context);
-                    if (externalCacheDirs.length > 0) {
-                        target = externalCacheDirs[0];
-                    }
+                    target = context.getExternalCacheDir();
                 } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
                         && TAG_EXTERNAL_MEDIA.equals(tag)) {
                     File[] externalMediaDirs = context.getExternalMediaDirs();
