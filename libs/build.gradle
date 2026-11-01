@@ -30,5 +30,6 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.annotation:annotation:1.0.0'
+    // Annotations are compile-time only (CLASS retention), so don't package them in the APK.
+    compileOnly 'androidx.annotation:annotation:1.0.0'
 }
